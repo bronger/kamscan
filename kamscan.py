@@ -10,7 +10,13 @@ calibration_file_path = Path.home()/"aktuell/kamscan_calibration.pickle"
 
 parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="take a calibration image")
+parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
+
+
+def wait_for_excess_processes(processes, max_processes=4):
+    while len({process for process in processes if process.poll() is not None}) > max_processes:
+        time.sleep(1)
 
 
 class Camera:
@@ -40,11 +46,6 @@ class Camera:
                     result.add(filepath)
         return result
 
-    @staticmethod
-    def _wait_for_excess_processes(processes, max_processes=4):
-        while len({process for process in processes if process.poll() is not None}) > max_processes:
-            time.sleep(1)
-
     @contextmanager
     def download(self):
         tempdir = Path(tempfile.mkdtemp())
@@ -54,11 +55,11 @@ class Camera:
             new_paths = paths - self.paths
             for path in new_paths:
                 if path.suffix == ".ARW":
-                    self._wait_for_excess_processes(processes)
+                    wait_for_excess_processes(processes)
                     process = subprocess.Popen(["dcraw", "-4", "-c", str(path), ">", str(tempdir/path.name), "&&",
                                                 "rm", str(path)], shell=True)
                     processes.add(process)
-        self._wait_for_excess_processes(processes, max_processes=0)
+        wait_for_excess_processes(processes, max_processes=0)
         yield tempdir
         shutil.rmtree(str(tempdir), ignore_errors=True)
 
@@ -69,9 +70,17 @@ class CorrectionData:
     x0 = y0 = None
     x1 = y1 = None
 
+    @property
+    def width(self):
+        return self.x1 - self.x0
+
+    @property
+    def height(self):
+        return self.y1 - self.y0
+
 def analyze_scan(x, y, scaling, filepath, number_of_points):
-    output = subprocess.check_output(
-        ["./analyze_scan.py", str(x), str(y), str(scaling), str(filepath), str(number_of_points)]).decode()
+    output = subprocess.check_output([str(Path(__file__).parent/"analyze_scan.py"), str(x), str(y), str(scaling),
+                                      str(filepath), str(number_of_points)]).decode()
     print(repr(output))
     result = json.loads(output)
     return result
@@ -104,6 +113,26 @@ else:
         correction_data = get_correction_data()
 
 
+basename = args.filepath.parent/args.filepath.stem
+intermediate_files = set()
+
 with camera.download() as directory:
-    # TBD: Process images
-    ...
+    processes = set()
+    for i, filename in enumerate(os.listdir(str(directory))):
+        filepath = directory/filename
+        wait_for_excess_processes(processes)
+        out_filepath = "{}_{:04}.tif".format(basename, i)
+        process = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(correction_data.width, correction_data.height,
+                                                                                correction_data.x0, correction_data.y0),
+                                    filepath, "-dither", "FloydSteinberg", "-compress", "group4", out_filepath])
+        intermediate_files.add(out_filepath)
+        processes.add(process)
+    wait_for_excess_processes(processes, max_processes=0)
+
+
+subprocess.check_call(["make_searchable_pdf.py", basename])
+for path in intermediate_files:
+    os.remove(path)
+
+
+subprocess.check_call(["evince", basename + ".pdf"])
