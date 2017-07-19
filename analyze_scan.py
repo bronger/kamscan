@@ -23,7 +23,6 @@ class ImageWindow(Image):
         subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(self.crop_width, self.crop_height,
                                                                            self.x0, self.y0), source, "+repage",
                                "-resize", "{}%".format(scaling * 100), "/tmp/analyze_scan.ppm"])
-        self.scaling = scaling
         kwargs["source"] = "/tmp/analyze_scan.ppm"
         super().__init__(*args, **kwargs)
 
