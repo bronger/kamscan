@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 #-*- mode: python -*-
 
-import argparse, pickle, time, os, tempfile, shutil, subprocess
+import argparse, pickle, time, os, tempfile, shutil, subprocess, json
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -69,12 +69,26 @@ class CorrectionData:
     x0 = y0 = None
     x1 = y1 = None
 
+def analyze_scan(x, y, scaling, filepath, number_of_points):
+    output = subprocess.check_output(
+        ["./analyze_scan.py", str(x), str(y), str(scaling), str(filepath), str(number_of_points)]).decode()
+    print(repr(output))
+    result = json.loads(output)
+    return result
+
 def analyze_calibration_image():
     with camera.download() as directory:
         filenames = os.listdir(str(directory))
         assert len(filenames) == 1
-        # TBD: Work with filenames[0]
-        ...
+        filepath = directory/filenames[0]
+        raw_points = analyze_scan(3000, 2000, 0.1, filepath, 4)
+        points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
+    correction_data = CorrectionData()
+    correction_data.x0 = min(point[0] for point in points)
+    correction_data.y0 = min(point[1] for point in points)
+    correction_data.x1 = max(point[0] for point in points)
+    correction_data.y1 = max(point[1] for point in points)
+    return correction_data
 
 def get_correction_data():
     correction_data = analyze_calibration_image()
