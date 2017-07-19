@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import subprocess
+import subprocess, json, sys
 from kivy.app import App
 from kivy.uix.image import Image
 
 
 class Result(Exception):
-    def __init__(self, x, y, *args, **kwargs):
+    def __init__(self, points, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.x, self.y = x, y
+        self.points = points
 
 
 class ImageWindow(Image):
 
-    def __init__(self, x, y, scaling, source, *args, **kwargs):
+    def __init__(self, x, y, scaling, source, number_of_points, *args, **kwargs):
         raw_width, raw_height = subprocess.check_output(["identify", source]).decode().split()[2].split("x")
         self.crop_width = min(int(raw_width), 1100 / scaling)
         self.crop_height = min(int(raw_height), 900 / scaling)
@@ -25,6 +25,8 @@ class ImageWindow(Image):
                                "-resize", "{}%".format(scaling * 100), "/tmp/analyze_scan.ppm"])
         kwargs["source"] = "/tmp/analyze_scan.ppm"
         super().__init__(*args, **kwargs)
+        self.number_of_points = number_of_points
+        self.points = []
 
     def on_touch_down(self, touch):
         image_width, image_height = self.norm_image_size
@@ -32,26 +34,30 @@ class ImageWindow(Image):
         offset_y = (self.height - image_height) / 2
         x = (touch.x - offset_x) * self.crop_width / image_width
         y = self.crop_height - (touch.y - offset_y) * self.crop_height / image_height
-        raise Result(x + self.x0, y + self.y0)
+        self.points.append((int(x + self.x0), int(y + self.y0)))
+        if len(self.points) == self.number_of_points:
+            raise Result(self.points)
 
 
 class AnalyzeApp(App):
 
-    def __init__(self, x, y, scaling, source, *args, **kwargs):
+    def __init__(self, x, y, scaling, source, number_of_points, *args, **kwargs):
         self.x = x
         self.y = y
         self.scaling = scaling
         self.source = source
+        self.number_of_points = number_of_points
         super().__init__(*args, **kwargs)
 
     def build(self):
-        return ImageWindow(self.x, self.y, self.scaling, self.source)
+        return ImageWindow(self.x, self.y, self.scaling, self.source, self.number_of_points)
 
     def run(self):
         try:
             super().run()
         except Result as result:
-            return result.x, result.y
+            return result.points
 
-x, y = AnalyzeApp(3000, 2000, 0.1, "DSC06499.ppm").run()
-print(x, y)
+
+result = AnalyzeApp(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), sys.argv[4], int(sys.argv[5])).run()
+json.dump(result, sys.stdout)
