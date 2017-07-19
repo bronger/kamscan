@@ -66,9 +66,6 @@ camera = Camera()
 
 
 class CorrectionData:
-    δ = None
-    φ = None
-    α = None
     x0 = y0 = None
     x1 = y1 = None
 
