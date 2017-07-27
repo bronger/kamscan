@@ -102,7 +102,7 @@ def analyze_calibration_image():
 
 def get_correction_data():
     correction_data = analyze_calibration_image()
-    pickle.dump(open(str(calibration_file_path), "wb"), correction_data)
+    pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
 
 if args.calibration:
