@@ -4,6 +4,10 @@
 import subprocess, json, sys
 from kivy.app import App
 from kivy.uix.image import Image
+from kivy.config import Config
+
+
+Config.set("kivy", "log_enable", "0")
 
 
 class Result(Exception):
