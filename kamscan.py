@@ -60,7 +60,7 @@ class Camera:
                     process = subprocess.Popen(["dcraw -4 -c '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)],
                                                shell=True)
                     processes.add(process)
-        wait_for_excess_processes(processes, max_processes=0)
+            wait_for_excess_processes(processes, max_processes=0)
         yield tempdir
         shutil.rmtree(str(tempdir), ignore_errors=True)
 
