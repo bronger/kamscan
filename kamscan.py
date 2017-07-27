@@ -122,18 +122,18 @@ with camera.download() as directory:
     for i, filename in enumerate(os.listdir(str(directory))):
         filepath = directory/filename
         wait_for_excess_processes(processes)
-        out_filepath = "{}_{:04}.tif".format(basename, i)
+        out_filepath = Path("{}_{:04}.tif".format(basename, i))
         process = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(correction_data.width, correction_data.height,
                                                                                 correction_data.x0, correction_data.y0),
-                                    filepath, "-dither", "FloydSteinberg", "-compress", "group4", out_filepath])
+                                    str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
         intermediate_files.add(out_filepath)
         processes.add(process)
     wait_for_excess_processes(processes, max_processes=0)
 
 
-subprocess.check_call(["make_searchable_pdf.py", basename])
+subprocess.check_call(["make_searchable_pdf.py", str(basename)])
 for path in intermediate_files:
-    os.remove(path)
+    os.remove(str(path))
 
 
-subprocess.check_call(["evince", basename + ".pdf"])
+subprocess.check_call(["evince", str(basename) + ".pdf"])
