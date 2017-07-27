@@ -79,6 +79,9 @@ class CorrectionData:
     def height(self):
         return self.y1 - self.y0
 
+    def __repr__(self):
+        return "links oben: {}, {}  rechts unten: {} {}".format(self.x0, self.y0, self.x1, self.y1)
+
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str((Path(__file__).parent/"analyze_scan.py").resolve()), str(x), str(y), str(scaling),
                                       str(filepath), str(number_of_points)]).decode()
