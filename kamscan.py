@@ -57,8 +57,8 @@ class Camera:
             for path in new_paths:
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
-                    process = subprocess.Popen(["dcraw", "-4", "-c", str(path), ">", str(tempdir/path.name), "&&",
-                                                "rm", str(path)], shell=True)
+                    process = subprocess.Popen(["dcraw -4 -c '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)],
+                                               shell=True)
                     processes.add(process)
         wait_for_excess_processes(processes, max_processes=0)
         yield tempdir
