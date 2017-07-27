@@ -15,7 +15,7 @@ args = parser.parse_args()
 
 
 def wait_for_excess_processes(processes, max_processes=4):
-    while len({process for process in processes if process.poll() is not None}) > max_processes:
+    while len({process for process in processes if process.poll() is None}) > max_processes:
         time.sleep(1)
 
 
