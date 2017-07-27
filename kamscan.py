@@ -57,8 +57,8 @@ class Camera:
             for path in new_paths:
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
-                    process = subprocess.Popen(["dcraw -c '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)],
-                                               shell=True)
+                    process = subprocess.Popen(
+                        ["dcraw -c -t 5 '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)], shell=True)
                     processes.add(process)
             wait_for_excess_processes(processes, max_processes=0)
         yield tempdir
@@ -91,7 +91,7 @@ def analyze_calibration_image():
         filenames = os.listdir(str(directory))
         assert len(filenames) == 1
         filepath = directory/filenames[0]
-        raw_points = analyze_scan(3000, 2000, 0.1, filepath, 4)
+        raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
         points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
     correction_data = CorrectionData()
     correction_data.x0 = min(point[0] for point in points)
