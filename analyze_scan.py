@@ -20,10 +20,21 @@ class ImageWindow(Image):
 
     def __init__(self, x, y, scaling, source, number_of_points, *args, **kwargs):
         raw_width, raw_height = subprocess.check_output(["identify", source]).decode().split()[2].split("x")
-        self.crop_width = min(int(raw_width), 1100 / scaling)
-        self.crop_height = min(int(raw_height), 900 / scaling)
+        raw_width, raw_height = int(raw_width), int(raw_height)
+        self.crop_width = min(raw_width, 1100 / scaling)
+        self.crop_height = min(raw_height, 900 / scaling)
         self.x0 = x - self.crop_width / 2
         self.y0 = y - self.crop_height / 2
+        if self.x0 < 0:
+            self.crop_width += self.x0
+            self.x0 = 0
+        if self.x0 + self.crop_width > raw_width:
+            self.crop_width = raw_width - self.x0
+        if self.y0 < 0:
+            self.crop_height += self.y0
+            self.y0 = 0
+        if self.y0 + self.crop_height > raw_height:
+            self.crop_height = raw_height - self.y0
         subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(self.crop_width, self.crop_height,
                                                                            self.x0, self.y0), source, "+repage",
                                "-resize", "{}%".format(scaling * 100), "/tmp/analyze_scan.ppm"])
