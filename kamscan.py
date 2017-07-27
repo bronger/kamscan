@@ -50,6 +50,7 @@ class Camera:
     def download(self):
         tempdir = Path(tempfile.mkdtemp())
         processes = set()
+        print("Bitte Bilder machen.  Dann:")
         with self._camera_connected():
             paths = self._collect_paths()
             new_paths = paths - self.paths
