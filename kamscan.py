@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-#-*- mode: python -*-
 
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json
 from contextlib import contextmanager
