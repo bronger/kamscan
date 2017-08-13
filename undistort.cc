@@ -147,7 +147,6 @@ int main(int argc, char* argv[]) {
 
     std::vector<float> res(image.width * image.height * 2 * 3);
     modifier.ApplySubpixelGeometryDistortion(0, 0, image.width, image.height, res.data());
-
     Image new_image(image.width, image.height, image.pixel_format);
     for (int x = 0; x < image.width; x++)
         for (int y = 0; y < image.height; y++) {
