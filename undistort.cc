@@ -129,11 +129,11 @@ int main(int argc, char* argv[]) {
     }
 
     lfModifier modifier(camera->CropFactor, image.width, image.height, image.pixel_format);
-    if (!modifier.EnableDistortionCorrection(lens, 10)) {
+    if (!modifier.EnableDistortionCorrection(lens, 50)) {
         std::cerr << "Failed to activate undistortion\n";
         return -1;
     }
-    if (!modifier.EnableTCACorrection(lens, 10)) {
+    if (!modifier.EnableTCACorrection(lens, 50)) {
         std::cerr << "Failed to activate un-TCA\n";
         return -1;
     }
