@@ -29,7 +29,7 @@ Image::Image(int width, int height, lfPixelFormat pixel_format) :
         channel_size = 2;
         break;
     default:
-        throw std::string("Invalid pixel format");
+        throw std::runtime_error("Invalid pixel format");
     }
     data.resize(width * height * channel_size * 3);
 }
@@ -54,7 +54,7 @@ std::istream& operator >>(std::istream &inputStream, Image &other)
     int maximum_color_value;
     inputStream >> magic_number;
     if (magic_number != "P6")
-        throw std::string("Invalid input file.  Must start with 'P6'.");
+        throw std::runtime_error("Invalid input file.  Must start with 'P6'.");
     inputStream >> other.width >> other.height >> maximum_color_value;
     inputStream.get(); // skip the trailing white space
     switch (maximum_color_value) {
@@ -67,7 +67,7 @@ std::istream& operator >>(std::istream &inputStream, Image &other)
         other.channel_size = 2;
         break;
     default:
-        throw std::string("Invalid PPM file: Maximum color value must be 255 or 65535.");
+        throw std::runtime_error("Invalid PPM file: Maximum color value must be 255 or 65535.");
     }
     size_t size = other.width * other.height * other.channel_size * 3;
     other.data.resize(size);
