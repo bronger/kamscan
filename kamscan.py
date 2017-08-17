@@ -69,17 +69,17 @@ camera = Camera()
 class CorrectionData:
     x0 = y0 = None
     x1 = y1 = None
+    x2 = y2 = None
+    x3 = y3 = None
 
     @property
-    def width(self):
-        return self.x1 - self.x0
-
-    @property
-    def height(self):
-        return self.y1 - self.y0
+    def coordinates(self):
+        return [str(self.x0), str(self.y0), str(self.x1), str(self.y1),
+                str(self.x2), str(self.y2), str(self.x3), str(self.y3)]
 
     def __repr__(self):
-        return "links oben: {}, {}  rechts unten: {} {}".format(self.x0, self.y0, self.x1, self.y1)
+        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(
+            self.x0, self.y0, self.x1, self.y1, self.x2, self.y2, self.x3, self.y3)
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str((Path(__file__).parent/"analyze_scan.py").resolve()), str(x), str(y), str(scaling),
@@ -96,10 +96,17 @@ def analyze_calibration_image():
         raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
         points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
     correction_data = CorrectionData()
-    correction_data.x0 = min(point[0] for point in points)
-    correction_data.y0 = min(point[1] for point in points)
-    correction_data.x1 = max(point[0] for point in points)
-    correction_data.y1 = max(point[1] for point in points)
+    for point in points:
+        if point[0] < 2000:
+            if point[1] < 3000:
+                correction_data.x0, correction_data.y0 = point
+            else:
+                correction_data.x2, correction_data.y2 = point
+        else:
+            if point[1] < 3000:
+                correction_data.x1, correction_data.y1 = point
+            else:
+                correction_data.x3, correction_data.y3 = point
     return correction_data
 
 def get_correction_data():
