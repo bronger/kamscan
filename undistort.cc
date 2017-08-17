@@ -3,6 +3,7 @@
 #include <iterator>
 #include <iostream>
 #include <string>
+#include <algorithm>
 #include "lensfun.h"
 
 class Image {
@@ -86,8 +87,8 @@ std::ostream& operator <<(std::ostream &outputStream, const Image &other)
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "You must give path to input file.\n";
+    if (argc != 10) {
+        std::cerr << "You must give path to input file as well as all four corner coordinates.\n";
         return -1;
     }
 
@@ -129,12 +130,45 @@ int main(int argc, char* argv[]) {
     }
 
     lfModifier modifier(camera->CropFactor, image.width, image.height, image.pixel_format);
-    if (!modifier.EnableDistortionCorrection(lens, 50)) {
+    lfModifier pc_coord_modifier(camera->CropFactor, image.width, image.height, image.pixel_format, true);
+    lfModifier back_modifier(camera->CropFactor, image.width, image.height, image.pixel_format, true);
+    if (!modifier.EnableDistortionCorrection(lens, 50) || !back_modifier.EnableDistortionCorrection(lens, 50) ||
+        !pc_coord_modifier.EnableDistortionCorrection(lens, 50)) {
         std::cerr << "Failed to activate undistortion\n";
         return -1;
     }
     if (!modifier.EnableTCACorrection(lens, 50)) {
         std::cerr << "Failed to activate un-TCA\n";
+        return -1;
+    }
+    std::vector<float> x, y;
+    x.push_back(std::stof(argv[2]));
+    y.push_back(std::stof(argv[3]));
+
+    x.push_back(std::stof(argv[6]));
+    y.push_back(std::stof(argv[7]));
+
+    x.push_back(std::stof(argv[4]));
+    y.push_back(std::stof(argv[5]));
+
+    x.push_back(std::stof(argv[8]));
+    y.push_back(std::stof(argv[9]));
+
+    x.push_back(std::stof(argv[2]));
+    y.push_back(std::stof(argv[3]));
+
+    x.push_back(std::stof(argv[4]));
+    y.push_back(std::stof(argv[5]));
+    std::vector<float> x_undist, y_undist;
+    for (int i = 0; i < x.size(); i++) {
+        float result[2];
+        pc_coord_modifier.ApplyGeometryDistortion(x[i], y[i], 1, 1, result);
+        x_undist.push_back(result[0]);
+        y_undist.push_back(result[1]);
+    }
+    if (!modifier.EnablePerspectiveCorrection(lens, 50, x_undist.data(), y_undist.data(), 6, 0) ||
+        !back_modifier.EnablePerspectiveCorrection(lens, 50, x_undist.data(), y_undist.data(), 6, 0)) {
+        std::cerr << "Failed to activate perspective correction\n";
         return -1;
     }
     if (!modifier.EnableVignettingCorrection(lens, 50, 4.0, 1000)) {
@@ -161,8 +195,17 @@ int main(int argc, char* argv[]) {
             new_image.set(x, y, 1, image.get(source_x_G, source_y_G, 1));
             new_image.set(x, y, 2, image.get(source_x_B, source_y_B, 2));
         }
-    std::ofstream file("out.ppm", std::ios::binary);
+    std::ofstream file(argv[1], std::ios::binary);
     file << new_image;
+
+    for (int i = 0; i < 4; i++) {
+        float result[2];
+        back_modifier.ApplyGeometryDistortion(x[i], y[i], 1, 1, result);
+        x[i] = result[0];
+        y[i] = result[1];
+    }
+    std::cout << "[" << std::min(x[0], x[2]) << ", " << std::min(y[0], y[1]) <<
+        ", " << std::max(x[1], x[3]) - std::min(x[0], x[2]) << ", " << std::max(y[2], y[3]) - std::min(y[0], y[1]) << "]\n";
     
     return 0;
 }
