@@ -111,14 +111,14 @@ int main(int argc, char* argv[]) {
 
     const lfLens *lens;
     const lfLens **lenses = ldb.FindLenses(camera, NULL, "E 50mm f/1.8 OSS");
-    if (lenses && !lenses[1])
+    if (lenses && !lenses[1]) {
         lens = lenses[0];
-    else if (!lenses[1]) {
-        std::cerr << "Lens name ambiguous\n";
-    } else {
+    } else if (!lenses) {
         std::cerr << "Cannot find lens in database\n";
         lf_free(lenses);
         return -1;
+    } else {
+        std::cerr << "Lens name ambiguous\n";
     }
     lf_free(lenses);
 
