@@ -131,12 +131,14 @@ with camera.download() as directory:
     for i, filename in enumerate(os.listdir(str(directory))):
         filepath = directory/filename
         wait_for_excess_processes(processes)
+        x0, y0, width, height = json.loads(
+            subprocess.check_output([str((Path(__file__).parent/"undistort").resolve()), str(filepath)] +
+                                    correction_data.coordinates).decode())
         out_filepath = Path("{}_{:04}.tif".format(basename, i))
-        process = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(correction_data.width, correction_data.height,
-                                                                                correction_data.x0, correction_data.y0),
+        convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
                                     str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
         intermediate_files.add(out_filepath)
-        processes.add(process)
+        processes.add(convert)
     wait_for_excess_processes(processes, max_processes=0)
 
 
