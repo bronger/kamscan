@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import argparse, pickle, time, os, tempfile, shutil, subprocess, json
+import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -11,11 +11,6 @@ parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="take a calibration image")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
-
-
-def wait_for_excess_processes(processes, max_processes=4):
-    while len({process for process in processes if process.poll() is None}) > max_processes:
-        time.sleep(1)
 
 
 def path_to_own_program(name):
@@ -126,21 +121,28 @@ else:
 basename = args.filepath.parent/args.filepath.stem
 intermediate_files = set()
 
+def process_image(filepath):
+    x0, y0, width, height = json.loads(
+        subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
+                                correction_data.coordinates_as_strings()).decode())
+    out_filepath = Path("{}_{:04}.tif".format(basename, i))
+    convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
+                                str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
+    return out_filepath
+
+pool = multiprocessing.Pool()
+results = set()
 with camera.download() as directory:
     processes = set()
     for i, filename in enumerate(os.listdir(str(directory))):
         filepath = directory/filename
-        wait_for_excess_processes(processes)
-        x0, y0, width, height = json.loads(
-            subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
-                                    correction_data.coordinates_as_strings()).decode())
-        out_filepath = Path("{}_{:04}.tif".format(basename, i))
-        convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
-                                    str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
-        intermediate_files.add(out_filepath)
-        processes.add(convert)
-    wait_for_excess_processes(processes, max_processes=0)
+        results.add(pool.apply_async(process_image, (filepath,)))
+pool.close()
+pool.join()
 
+intermediate_files = set()
+for result in results:
+    intermediate_files.add(result.get())
 
 subprocess.check_call(["make_searchable_pdf.py", str(basename)])
 for path in intermediate_files:
