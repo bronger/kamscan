@@ -137,11 +137,11 @@ else:
 basename = args.filepath.parent/args.filepath.stem
 intermediate_files = set()
 
-def process_image(filepath):
+def process_image(filepath, index):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
-    out_filepath = Path("{}_{:04}.tif".format(basename, i))
+    out_filepath = Path("{}_{:04}.tif".format(basename, index))
     convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
                                 str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
     return out_filepath
@@ -152,7 +152,7 @@ with camera.download() as directory:
     processes = set()
     for i, filename in enumerate(os.listdir(str(directory))):
         filepath = directory/filename
-        results.add(pool.apply_async(process_image, (filepath,)))
+        results.add(pool.apply_async(process_image, (filepath, i)))
 pool.close()
 pool.join()
 
