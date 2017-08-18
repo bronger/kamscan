@@ -71,19 +71,13 @@ camera = Camera()
 
 
 class CorrectionData:
-    x0 = y0 = None
-    x1 = y1 = None
-    x2 = y2 = None
-    x3 = y3 = None
+    coordinates = 8 * [None]
 
-    @property
-    def coordinates(self):
-        return [str(self.x0), str(self.y0), str(self.x1), str(self.y1),
-                str(self.x2), str(self.y2), str(self.x3), str(self.y3)]
+    def coordinates_as_strings(self):
+        return [str(coordinate) for coordinate in self.coordinates]
 
     def __repr__(self):
-        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(
-            self.x0, self.y0, self.x1, self.y1, self.x2, self.y2, self.x3, self.y3)
+        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coodrinates)
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
@@ -103,14 +97,14 @@ def analyze_calibration_image():
     for point in points:
         if point[0] < 2000:
             if point[1] < 3000:
-                correction_data.x0, correction_data.y0 = point
+                correction_data.coordinates[0:2] = point
             else:
-                correction_data.x2, correction_data.y2 = point
+                correction_data.coordinates[4:6] = point
         else:
             if point[1] < 3000:
-                correction_data.x1, correction_data.y1 = point
+                correction_data.coordinates[2:4] = point
             else:
-                correction_data.x3, correction_data.y3 = point
+                correction_data.coordinates[6:8] = point
     return correction_data
 
 def get_correction_data():
@@ -137,7 +131,7 @@ with camera.download() as directory:
         wait_for_excess_processes(processes)
         x0, y0, width, height = json.loads(
             subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
-                                    correction_data.coordinates).decode())
+                                    correction_data.coordinates_as_strings()).decode())
         out_filepath = Path("{}_{:04}.tif".format(basename, i))
         convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
                                     str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
