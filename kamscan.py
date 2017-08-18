@@ -13,6 +13,11 @@ parser.add_argument("filepath", type=Path, help="path to the PDF file for storin
 args = parser.parse_args()
 
 
+def wait_for_excess_processes(processes, max_processes=multiprocessing.cpu_count()):
+    while len({process for process in processes if process.poll() is None}) > max_processes:
+        time.sleep(1)
+
+
 def path_to_own_program(name):
     return (Path(__file__).parent/name).resolve()
 
