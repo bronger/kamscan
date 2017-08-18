@@ -81,7 +81,9 @@ camera = Camera()
 
 
 class CorrectionData:
-    coordinates = 8 * [None]
+
+    def __init__(self):
+        self.coordinates = 8 * [None]
 
     def coordinates_as_strings(self):
         return [str(coordinate) for coordinate in self.coordinates]
