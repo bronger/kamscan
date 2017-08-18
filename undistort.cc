@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
     lf_free(cameras);
 
     const lfLens *lens;
-    const lfLens **lenses = ldb.FindLenses(camera, NULL, "E 50mm f/1.8 OSS");
+    const lfLens **lenses = ldb.FindLenses(camera, NULL, "E 50mm f/1.8 OSS (kamscan)");
     if (lenses && !lenses[1]) {
         lens = lenses[0];
     } else if (!lenses) {
