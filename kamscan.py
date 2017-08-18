@@ -18,6 +18,10 @@ def wait_for_excess_processes(processes, max_processes=4):
         time.sleep(1)
 
 
+def path_to_own_program(name):
+    return (Path(__file__).parent/name).resolve()
+
+
 class Camera:
     path = Path("/media/bronger/3937-6637/DCIM")
 
@@ -82,7 +86,7 @@ class CorrectionData:
             self.x0, self.y0, self.x1, self.y1, self.x2, self.y2, self.x3, self.y3)
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
-    output = subprocess.check_output([str((Path(__file__).parent/"analyze_scan.py").resolve()), str(x), str(y), str(scaling),
+    output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
                                       str(filepath), str(number_of_points)]).decode()
     print(repr(output))
     result = json.loads(output)
@@ -132,7 +136,7 @@ with camera.download() as directory:
         filepath = directory/filename
         wait_for_excess_processes(processes)
         x0, y0, width, height = json.loads(
-            subprocess.check_output([str((Path(__file__).parent/"undistort").resolve()), str(filepath)] +
+            subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                     correction_data.coordinates).decode())
         out_filepath = Path("{}_{:04}.tif".format(basename, i))
         convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
