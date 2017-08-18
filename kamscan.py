@@ -153,8 +153,8 @@ with camera.download() as directory:
     for i, filename in enumerate(os.listdir(str(directory))):
         filepath = directory/filename
         results.add(pool.apply_async(process_image, (filepath, i)))
-pool.close()
-pool.join()
+    pool.close()
+    pool.join()
 
 intermediate_files = set()
 for result in results:
