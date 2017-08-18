@@ -94,14 +94,16 @@ def analyze_calibration_image():
         raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
         points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
     correction_data = CorrectionData()
+    center_x = sum(point[0] for point in points) / len(points)
+    center_y = sum(point[1] for point in points) / len(points)
     for point in points:
-        if point[0] < 2000:
-            if point[1] < 3000:
+        if point[0] < center_x:
+            if point[1] < center_y:
                 correction_data.coordinates[0:2] = point
             else:
                 correction_data.coordinates[4:6] = point
         else:
-            if point[1] < 3000:
+            if point[1] < center_y:
                 correction_data.coordinates[2:4] = point
             else:
                 correction_data.coordinates[6:8] = point
