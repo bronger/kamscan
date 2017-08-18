@@ -33,11 +33,21 @@ class Camera:
     def _camera_connected(self):
         if not self.path.exists():
             print("Bitte Kamera einstöpseln.")
-        while not self.path.exists():
+        while True:
+            try:
+                if self.path.exists():
+                    break
+            except PermissionError as error:
+                print(error)
             time.sleep(1)
         yield
         print("Bitte Kamera ausstöpseln.")
-        while self.path.exists():
+        while True:
+            try:
+                if not self.path.exists():
+                    break
+            except PermissionError as error:
+                print(error)
             time.sleep(1)        
 
     def _collect_paths(self):
