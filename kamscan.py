@@ -142,8 +142,8 @@ def process_image(filepath, index):
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
     out_filepath = Path("{}_{:04}.tif".format(basename, index))
-    convert = subprocess.Popen(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
-                                str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
+    subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
+                           str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
     return out_filepath
 
 pool = multiprocessing.Pool()
