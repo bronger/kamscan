@@ -77,7 +77,6 @@ class CorrectionData:
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
                                       str(filepath), str(number_of_points)]).decode()
-    print(repr(output))
     result = json.loads(output)
     return result
 
