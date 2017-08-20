@@ -144,7 +144,7 @@ else:
         correction_data = get_correction_data()
 
 
-def process_image(filepath, out_filepath):
+def process_image(filepath, output_path):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
@@ -156,25 +156,30 @@ def process_image(filepath, out_filepath):
         convert_call.extend(["-colorspace", "gray"])
     elif args.mode == "mono":
         convert_call.extend(["-dither", "FloydSteinberg", "-compress", "group4"])
-    convert_call.append(str(out_filepath))
+    tiff_filepath = filepath.with_suffix(".tiff")
+    convert_call.append(str(tiff_filepath))
     subprocess.check_call(convert_call)
+    pdf_filepath = output_path/filepath.with_suffix(".pdf").name
+    subprocess.check_call(["tesseract", str(tiff_filepath), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "deu", "pdf"])
+    return pdf_filepath
 
 with tempfile.TemporaryDirectory() as tempdir:
-    basename = Path(tempdir)/args.filepath.stem
+    tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
     with camera.download() as directory:
         processes = set()
-        for i, filename in enumerate(os.listdir(str(directory))):
+        for filename in os.listdir(str(directory)):
             filepath = directory/filename
-            results.add(pool.apply_async(process_image, (filepath, "{}_{:04}.tif".format(basename, i))))
+            results.add(pool.apply_async(process_image, (filepath, tempdir)))
         pool.close()
         pool.join()
+    pdfs = []
     for result in results:
-        result.get()
+        pdfs.append(result.get())
+    pdfs.sort()
 
-    subprocess.check_call(["make_searchable_pdf.py", str(basename)])
-    shutil.move(str(basename.with_suffix(".pdf")), str(args.filepath.parent))
-
+    subprocess.check_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-sOutputFile={}".format(args.filepath)] +
+                          [str(pdf) for pdf in pdfs])
 
 subprocess.check_call(["evince", str(args.filepath)])
