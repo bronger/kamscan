@@ -72,7 +72,7 @@ class Camera:
                 path = path_with_timestamp[1]
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
-                    dcraw_call = "dcraw -c -t 5 -o 0 -M -W -g 1 1"
+                    dcraw_call = "dcraw -c -t 5 -o 0 -M -g 1 1"
                     if args.mode in {"grey", "mono"}:
                         dcraw_call += " -d"
                     process = subprocess.Popen(
