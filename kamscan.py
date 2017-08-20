@@ -100,7 +100,11 @@ class CorrectionData:
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
                                       str(filepath), str(number_of_points)]).decode()
-    result = json.loads(output)
+    try:
+        result = json.loads(output)
+    except json.decoder.JSONDecodeError:
+        print("Invalid JSON: {}".repr(output))
+        raise
     return result
 
 def analyze_calibration_image():
