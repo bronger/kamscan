@@ -9,6 +9,7 @@ calibration_file_path = Path.home()/"aktuell/kamscan_calibration.pickle"
 
 parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="take a calibration image")
+parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"}, help="colour mode of resulting pages")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
 
@@ -65,8 +66,11 @@ class Camera:
             for path in new_paths:
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
+                    dcraw_call = "dcraw -c -t 5 -o 0 -M -W -g 1 1"
+                    if args.mode in {"grey", "mono"}:
+                        dcraw_call += " -d"
                     process = subprocess.Popen(
-                        ["dcraw -c -t 5 '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)], shell=True)
+                        [dcraw_call + " '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)], shell=True)
                     processes.add(process)
             wait_for_excess_processes(processes, max_processes=0)
         yield tempdir
@@ -135,8 +139,16 @@ def process_image(filepath, out_filepath):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
-    subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
-                           str(filepath), "-dither", "FloydSteinberg", "-compress", "group4", str(out_filepath)])
+    convert_call = ["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), str(filepath)]
+    if args.mode == "color":
+        convert_call.extend(["-profile", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
+                             "-set", "colorspace", "XYZ", "-colorspace", "sRGB"])
+    elif args.mode == "gray":
+        convert_call.extend(["-colorspace", "gray"])
+    elif args.mode == "mono":
+        convert_call.extend(["-dither", "FloydSteinberg", "-compress", "group4"])
+    convert_call.append(str(out_filepath))
+    subprocess.check_call(convert_call)
 
 with tempfile.TemporaryDirectory() as tempdir:
     basename = Path(tempdir)/args.filepath.stem
