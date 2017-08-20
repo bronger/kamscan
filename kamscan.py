@@ -133,8 +133,6 @@ else:
         correction_data = get_correction_data()
 
 
-intermediate_files = set()
-
 def process_image(filepath, out_filepath):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
