@@ -110,7 +110,7 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
 def analyze_calibration_image():
     with camera.download() as directory:
         filenames = os.listdir(str(directory))
-        assert len(filenames) == 1
+        assert len(filenames) == 1, filenames
         filepath = directory/filenames[0]
         raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
         points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
