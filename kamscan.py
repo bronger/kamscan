@@ -79,6 +79,7 @@ class Camera:
                         [dcraw_call + " '{0}' > '{2}/{1:06}.ppm' && rm '{0}'".format(path, i, tempdir)], shell=True)
                     processes.add(process)
             wait_for_excess_processes(processes, max_processes=0)
+            assert all(process.returncode == 0 for process in processes)
         yield tempdir
         shutil.rmtree(str(tempdir), ignore_errors=True)
 
