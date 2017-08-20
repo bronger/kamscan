@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing
+import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -63,14 +63,20 @@ class Camera:
         with self._camera_connected():
             paths = self._collect_paths()
             new_paths = paths - self.paths
+            paths_with_timestamps = []
             for path in new_paths:
+                output = subprocess.check_output(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)]).decode().strip()
+                paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
+            paths_with_timestamps.sort()
+            for i, path_with_timestamp in enumerate(paths_with_timestamps):
+                path = path_with_timestamp[1]
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
                     dcraw_call = "dcraw -c -t 5 -o 0 -M -W -g 1 1"
                     if args.mode in {"grey", "mono"}:
                         dcraw_call += " -d"
                     process = subprocess.Popen(
-                        [dcraw_call + " '{0}' > '{1}.ppm' && rm '{0}'".format(path, tempdir/path.stem)], shell=True)
+                        [dcraw_call + " '{0}' > '{2}/{1:06}.ppm' && rm '{0}'".format(path, i, tempdir)], shell=True)
                     processes.add(process)
             wait_for_excess_processes(processes, max_processes=0)
         yield tempdir
