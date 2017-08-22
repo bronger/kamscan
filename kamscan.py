@@ -150,7 +150,7 @@ def analyze_calibration_image():
     correction_data.red = red * camera.red / green
     correction_data.green = camera.green
     correction_data.blue = blue * camera.blue / green
-    correction_data.exposure_correction = green / 65535
+    correction_data.exposure_correction = 65535 / green
     return correction_data
 
 
