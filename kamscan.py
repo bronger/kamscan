@@ -36,20 +36,23 @@ class Camera:
         with self._camera_connected():
             self.paths = self._collect_paths()
 
+    def path_exists(self):
+        while True:
+            try:
+                return self.path.exists()
+            except PermissionError as error:
+                print(error)
+                time.sleep(1)
+
     @contextmanager
     def _camera_connected(self):
-        if not self.path.exists():
+        if not self.path_exists():
             print("Bitte Kamera einstöpseln.")
-        while not self.path.exists():
+        while not self.path_exists():
             time.sleep(1)
         yield
         print("Bitte Kamera ausstöpseln.")
-        while True:
-            try:
-                if not self.path.exists():
-                    break
-            except PermissionError as error:
-                print(error)
+        while self.path_exists():
             time.sleep(1)        
 
     def _collect_paths(self):
