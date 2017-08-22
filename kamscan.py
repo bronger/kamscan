@@ -170,11 +170,16 @@ else:
         correction_data = pickle.load(open(str(calibration_file_path), "rb"))
     except FileNotFoundError:
         correction_data = get_correction_data()
-camera.set_correction(correction_data)
 
 
 def process_image(filepath, output_path):
-    filepath = call_dcraw(filepath, (["-d"] if args.mode in {"gray", "mono"} else []) + ["-W"])
+    filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=correction_data.exposure_correction)
+    flatfield_path = (calibration_file_path.parent/"kamscan_flatfield").with_suffix(
+        ".pgm" if args.mode in {"gray", "mono"} else ".ppm")
+    tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
+    subprocess.check_call(["convert", str(filepath), str(flatfield_path), "-compose", "dividesrc", "-composite",
+                           str(tempfile)])
+    os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
