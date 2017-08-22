@@ -77,7 +77,7 @@ class Camera:
                 for __, path in paths_with_timestamps:
                     path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
                     i += 1
-                rsync = subprocess.Popen(["rsync", "-a"] + [str(path) for path in path_tripletts] + [str(tempdir)])
+                rsync = subprocess.Popen(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)])
                 while path_tripletts:
                     for triplett in path_tripletts:
                         old_path, intermediate_path, destination = triplett
