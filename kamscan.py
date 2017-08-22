@@ -98,7 +98,6 @@ class CorrectionData:
 
     def __init__(self):
         self.coordinates = 8 * [None]
-        self.red = self.green = self.blue = None
         self.exposure_correction = None
 
     def coordinates_as_strings(self):
@@ -106,8 +105,7 @@ class CorrectionData:
 
     def __repr__(self):
         return """links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}
-rot: {}  grün: {}  blau: {}
-Belichtungskorrektur: {}""".format(*(self.coordinates + [self.red, self.green, self.blue, self.exposure_correction]))
+Belichtungskorrektur: {}""".format(*(self.coordinates + [self.exposure_correction]))
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
@@ -142,9 +140,6 @@ def analyze_calibration_image():
                 correction_data.coordinates[2:4] = point
             else:
                 correction_data.coordinates[6:8] = point
-    correction_data.red = red * camera.red / green
-    correction_data.green = camera.green
-    correction_data.blue = blue * camera.blue / green
     correction_data.exposure_correction = 65535 / green
     return correction_data
 
