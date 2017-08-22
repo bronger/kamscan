@@ -26,15 +26,15 @@ def path_to_own_program(name):
 class Camera:
     path = Path("/media/bronger/3937-6637/DCIM")
 
-    def __init__(self, correction_data=None):
-        if correction_data:
-            self.red, self.green, self.blue = correction_data.red, correction_data.green, correction_data.blue
-            self.exposure_correction = correction_data.exposure_correction
-        else:
-            self.red, self.green, self.blue = 2.986434, 1.000000, 1.248604
-            self.exposure_correction = 1
+    def __init__(self):
+        self.red, self.green, self.blue = 2.986434, 1.000000, 1.248604
+        self.exposure_correction = 1
         with self._camera_connected():
             self.paths = self._collect_paths()
+
+    def set_correction(self, correction_data):
+        self.red, self.green, self.blue = correction_data.red, correction_data.green, correction_data.blue
+        self.exposure_correction = correction_data.exposure_correction
 
     def path_exists(self):
         while True:
@@ -94,6 +94,8 @@ class Camera:
         yield tempdir
         shutil.rmtree(str(tempdir), ignore_errors=True)
 
+camera = Camera()
+
 
 class CorrectionData:
 
@@ -122,7 +124,6 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
-    camera = Camera()
     with camera.download() as directory:
         filenames = os.listdir(str(directory))
         assert len(filenames) == 1, filenames
@@ -166,6 +167,7 @@ else:
         correction_data = pickle.load(open(str(calibration_file_path), "rb"))
     except FileNotFoundError:
         correction_data = get_correction_data()
+camera.set_correction(correction_data)
 
 
 def process_image(filepath, output_path):
@@ -191,7 +193,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    with Camera(correction_data).download() as directory:
+    with camera.download() as directory:
         processes = set()
         for filename in os.listdir(str(directory)):
             filepath = directory/filename
