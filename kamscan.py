@@ -177,9 +177,9 @@ def process_image(filepath, output_path):
         convert_call.extend(["-profile", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
                              "-set", "colorspace", "XYZ", "-colorspace", "sRGB"])
     elif args.mode == "gray":
-        convert_call.extend(["-colorspace", "gray"])
+        convert_call.extend(["-set", "colorspace", "gray"])
     elif args.mode == "mono":
-        convert_call.extend(["-dither", "FloydSteinberg", "-compress", "group4"])
+        convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-compress", "group4"])
     tiff_filepath = filepath.with_suffix(".tiff")
     convert_call.append(str(tiff_filepath))
     subprocess.check_call(convert_call)
