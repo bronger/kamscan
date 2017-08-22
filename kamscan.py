@@ -93,7 +93,7 @@ camera = Camera()
 
 
 def call_dcraw(path, extra_options=[]):
-    dcraw_call = ["dcraw", "-t", "5", "-o", "0", "-M", "-g", "1", "1", "-W"] + extra_options + [str(path)]
+    dcraw_call = ["dcraw", "-t", "5", "-o", "0", "-M", "-g", "1", "1"] + extra_options + [str(path)]
     subprocess.check_call(dcraw_call)
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
     assert output_path.exists()
@@ -130,7 +130,7 @@ def analyze_calibration_image():
     one_image_processed = False
     for path in camera.images():
         assert not one_image_processed
-        path = call_dcraw(path)
+        path = call_dcraw(path, ["-W"])
         raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
         points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
         red, green, blue = [float(subprocess.check_output(
@@ -175,7 +175,7 @@ camera.set_correction(correction_data)
 
 
 def process_image(filepath, output_path):
-    filepath = call_dcraw(filepath, ["-d"] if args.mode in {"gray", "mono"} else [])
+    filepath = call_dcraw(filepath, (["-d"] if args.mode in {"gray", "mono"} else []) + ["-W"])
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
