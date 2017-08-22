@@ -1,12 +1,10 @@
 #!/usr/bin/python3
 
-import subprocess, json, sys
+import subprocess, json, sys, os
+os.environ["KIVY_NO_FILELOG"] = "1"
+os.environ["KIVY_NO_CONSOLELOG"] = "1"
 from kivy.app import App
 from kivy.uix.image import Image
-from kivy.config import Config
-
-
-Config.set("kivy", "log_enable", "0")
 
 
 class Result(Exception):

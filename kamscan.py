@@ -119,11 +119,7 @@ Belichtungskorrektur: {}""".format(*(self.coordinates + [self.red, self.green, s
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
                                       str(filepath), str(number_of_points)]).decode()
-    try:
-        result = json.loads(output)
-    except json.decoder.JSONDecodeError:
-        print("Invalid JSON: {}".format(repr(output)))
-        raise
+    result = json.loads(output)
     return result
 
 def analyze_calibration_image():
