@@ -14,11 +14,6 @@ parser.add_argument("filepath", type=Path, help="path to the PDF file for storin
 args = parser.parse_args()
 
 
-def wait_for_excess_processes(processes, max_processes=multiprocessing.cpu_count()):
-    while len({process for process in processes if process.poll() is None}) > max_processes:
-        time.sleep(1)
-
-
 def path_to_own_program(name):
     return (Path(__file__).parent/name).resolve()
 
@@ -64,37 +59,43 @@ class Camera:
                     result.add(filepath)
         return result
 
-    @contextmanager
     def images(self):
-        tempdir = Path(tempfile.mkdtemp())
-        processes = set()
-        print("Bitte Bilder machen.  Dann:")
-        with self._camera_connected():
-            paths = self._collect_paths()
-            new_paths = paths - self.paths
-            paths_with_timestamps = []
-            for path in new_paths:
-                output = subprocess.check_output(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)]).decode().strip()
-                paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
-            paths_with_timestamps.sort()
-            for i, path_with_timestamp in enumerate(paths_with_timestamps):
-                path = path_with_timestamp[1]
-                if path.suffix == ".ARW":
-                    wait_for_excess_processes(processes)
-                    white_overshot = 1.2 if args.mode in {"grey", "mono"} else 1
-                    dcraw_call = "dcraw -c -t 5 -o 0 -M -g 1 1 -r {0} {1} {2} {1} -b {3} ".format(
-                        self.red, self.green, self.blue, self.exposure_correction * white_overshot)
-                    if args.mode in {"grey", "mono"}:
-                        dcraw_call += " -d"
-                    process = subprocess.Popen(
-                        [dcraw_call + " '{0}' > '{2}/{1:06}.pnm' && rm '{0}'".format(path, i, tempdir)], shell=True)
-                    processes.add(process)
-            wait_for_excess_processes(processes, max_processes=0)
-            assert all(process.returncode == 0 for process in processes)
-        yield tempdir
-        shutil.rmtree(str(tempdir), ignore_errors=True)
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = Path(tempdir)
+            print("Bitte Bilder machen.  Dann:")
+            with self._camera_connected():
+                paths = self._collect_paths()
+                new_paths = paths - self.paths
+                paths_with_timestamps = []
+                for path in new_paths:
+                    output = subprocess.check_output(
+                        ["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)]).decode().strip()
+                    paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
+                paths_with_timestamps.sort()
+                path_tripletts = set()
+                i = 0
+                for __, path in paths_with_timestamps:
+                    path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
+                    i += 1
+                rsync = subprocess.Popen(["rsync", "-a"] + [str(path) for path in path_tripletts] + [str(tempdir)])
+                while path_tripletts:
+                    for triplett in path_tripletts:
+                        old_path, intermediate_path, destination = triplett
+                        if intermediate_path.exists():
+                            os.rename(str(intermediate_path), str(destination))
+                            os.remove(str(old_path))
+                            path_tripletts.remove(triplett)
+                            yield destination
+                            break
+                assert rsync.wait() == 0
 
 camera = Camera()
+
+
+def call_dcraw(path, extra_options=[]):
+    dcraw_call = ["dcraw", "-t", "5", "-o", "0", "-M", "-g", "1", "1", "-W"] + extra_options + [str(path)]
+    output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
+    return output_path, subprocess.Popen(dcraw_call)
 
 
 class CorrectionData:
@@ -124,16 +125,18 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
-    with camera.images() as directory:
-        filenames = os.listdir(str(directory))
-        assert len(filenames) == 1, filenames
-        filepath = directory/filenames[0]
-        raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
-        points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
+    one_image_processed = False
+    for path in camera.images():
+        assert not one_image_processed
+        path, dcraw = call_dcraw(path)
+        assert dcraw.wait() == 0
+        raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
+        points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
         red, green, blue = [float(subprocess.check_output(
-            ["convert", "-extract", "100x100+1950+2950", str(filepath),
+            ["convert", "-extract", "100x100+1950+2950", str(path),
              "-channel", channel, "-separate", "-format", "%[mean]", "info:"]).decode())
                             for channel in ("Red", "Green", "Blue")]
+        one_image_processed = True
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
     center_y = sum(point[1] for point in points) / len(points)
@@ -171,6 +174,8 @@ camera.set_correction(correction_data)
 
 
 def process_image(filepath, output_path):
+    filepath, dcraw = call_dcraw(filepath, ["-d"] if args.mode in {"gray", "mono"} else [])
+    assert dcraw.wait() == 0
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
@@ -193,13 +198,10 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    with camera.images() as directory:
-        processes = set()
-        for filename in os.listdir(str(directory)):
-            filepath = directory/filename
-            results.add(pool.apply_async(process_image, (filepath, tempdir)))
-        pool.close()
-        pool.join()
+    for path in camera.images():
+        results.add(pool.apply_async(process_image, (path, tempdir)))
+    pool.close()
+    pool.join()
     pdfs = []
     for result in results:
         pdfs.append(result.get())
