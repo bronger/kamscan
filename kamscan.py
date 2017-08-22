@@ -26,7 +26,11 @@ def path_to_own_program(name):
 class Camera:
     path = Path("/media/bronger/3937-6637/DCIM")
 
-    def __init__(self):
+    def __init__(self, correction_data=None):
+        if correction_data:
+            self.red, self.green, self.blue = correction_data.red, correction_data.green, correction_data.blue
+        else:
+            self.red, self.green, self.blue = 2.986434, 1.000000, 1.248604
         with self._camera_connected():
             self.paths = self._collect_paths()
 
@@ -72,7 +76,7 @@ class Camera:
                 path = path_with_timestamp[1]
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
-                    dcraw_call = "dcraw -c -t 5 -o 0 -M -g 1 1"
+                    dcraw_call = "dcraw -c -t 5 -o 0 -M -g 1 1 -r {0} {1} {2} {1}".format(self.red, self.green, self.blue)
                     if args.mode in {"grey", "mono"}:
                         dcraw_call += " -d"
                     process = subprocess.Popen(
@@ -83,19 +87,19 @@ class Camera:
         yield tempdir
         shutil.rmtree(str(tempdir), ignore_errors=True)
 
-camera = Camera()
-
 
 class CorrectionData:
 
     def __init__(self):
         self.coordinates = 8 * [None]
+        self.red = self.green = self.blue = None
 
     def coordinates_as_strings(self):
         return [str(coordinate) for coordinate in self.coordinates]
 
     def __repr__(self):
         return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coordinates)
+
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
@@ -108,12 +112,16 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
+    camera = Camera()
     with camera.download() as directory:
         filenames = os.listdir(str(directory))
         assert len(filenames) == 1, filenames
         filepath = directory/filenames[0]
         raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
         points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
+        red, green, blue = [subprocess.check_output(["convert", "-extract", "100x100+1950+2950", str(filepath),
+                                                     "-channel", channel, "-separate", "-format", "%[mean]", "info:"])
+                            for channel in ("Red", "Green", "Blue")]
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
     center_y = sum(point[1] for point in points) / len(points)
@@ -128,7 +136,11 @@ def analyze_calibration_image():
                 correction_data.coordinates[2:4] = point
             else:
                 correction_data.coordinates[6:8] = point
+    correction_data.red = red * camera.red / green
+    correction_data.green = camera.green
+    correction_data.blue = blue * camera.blue / green
     return correction_data
+
 
 def get_correction_data():
     correction_data = analyze_calibration_image()
@@ -167,7 +179,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    with camera.download() as directory:
+    with Camera(correction_data).download() as directory:
         processes = set()
         for filename in os.listdir(str(directory)):
             filepath = directory/filename
