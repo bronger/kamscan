@@ -65,7 +65,7 @@ class Camera:
         return result
 
     @contextmanager
-    def download(self):
+    def images(self):
         tempdir = Path(tempfile.mkdtemp())
         processes = set()
         print("Bitte Bilder machen.  Dann:")
@@ -124,7 +124,7 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
-    with camera.download() as directory:
+    with camera.images() as directory:
         filenames = os.listdir(str(directory))
         assert len(filenames) == 1, filenames
         filepath = directory/filenames[0]
@@ -193,7 +193,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    with camera.download() as directory:
+    with camera.images() as directory:
         processes = set()
         for filename in os.listdir(str(directory)):
             filepath = directory/filename
