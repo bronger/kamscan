@@ -106,7 +106,9 @@ class CorrectionData:
         return [str(coordinate) for coordinate in self.coordinates]
 
     def __repr__(self):
-        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coordinates)
+        return """links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}
+rot: {}  grün: {}  blau: {}
+Belichtungskorrektur: {}""".format(*(self.coordinates + [self.red, self.green, self.blue, self.exposure_correction]))
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
