@@ -191,13 +191,6 @@ int main(int argc, char* argv[]) {
         std::cerr << "Failed to activate perspective correction\n";
         return -1;
     }
-    if (!modifier.EnableVignettingCorrection(lens, 50, 4.0, 1000)) {
-        std::cerr << "Failed to activate devignetting\n";
-        return -1;
-    }
-
-    modifier.ApplyColorModification(image.data.data(), 0, 0, image.width, image.height,
-                                    image.components, image.width * image.channels * image.channel_size);
 
     std::vector<float> res(image.width * image.height * 2 * image.channels);
     if (image.channels == 3)
