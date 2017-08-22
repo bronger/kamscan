@@ -86,8 +86,15 @@ class Camera:
 camera = Camera()
 
 
-def call_dcraw(path, extra_options=[]):
-    dcraw_call = ["dcraw", "-t", "5", "-o", "0", "-M", "-g", "1", "1"] + extra_options + [str(path)]
+def call_dcraw(path, extra_raw, gray=False, b=None):
+    dcraw_call = ["dcraw", "-t", "5"]
+    if extra_raw:
+        dcraw_call.extend(["-o", "0", "-M", "-g", "1", "1", "-r", "1", "1", "1", "1", "-W"])
+    if gray:
+        dcraw_call.append("-d")
+    if b is not None:
+        dcraw_call.extend(["-b", str(b)])
+    dcraw_call.append(str(path))
     subprocess.check_call(dcraw_call)
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
     assert output_path.exists()
@@ -116,9 +123,9 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
 
 def analyze_calibration_image():
     one_image_processed = False
-    for path in camera.images():
+    for old_path in camera.images():
         assert not one_image_processed
-        path = call_dcraw(path, ["-W"])
+        path = call_dcraw(old_path, extra_raw=False)
         raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
         points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
         red, green, blue = [float(subprocess.check_output(
