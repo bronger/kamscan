@@ -154,7 +154,7 @@ def analyze_calibration_image():
                 correction_data.coordinates[2:4] = point
             else:
                 correction_data.coordinates[6:8] = point
-    correction_data.exposure_correction = 65535 / green
+    correction_data.exposure_correction = 1 / level
     return correction_data
 
 
