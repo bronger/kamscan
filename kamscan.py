@@ -22,14 +22,8 @@ class Camera:
     path = Path("/media/bronger/3937-6637/DCIM")
 
     def __init__(self):
-        self.red, self.green, self.blue = 2.986434, 1.000000, 1.248604
-        self.exposure_correction = 1
         with self._camera_connected():
             self.paths = self._collect_paths()
-
-    def set_correction(self, correction_data):
-        self.red, self.green, self.blue = correction_data.red, correction_data.green, correction_data.blue
-        self.exposure_correction = correction_data.exposure_correction
 
     def path_exists(self):
         while True:
