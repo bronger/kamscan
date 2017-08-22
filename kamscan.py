@@ -128,10 +128,17 @@ def analyze_calibration_image():
             path = call_dcraw(old_path, extra_raw=False)
             raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
             points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
-            red, green, blue = [float(subprocess.check_output(
+
+            path = call_dcraw(old_path, extra_raw=True, gray=True)
+            level = max(float(subprocess.check_output(
                 ["convert", "-extract", "100x100+1950+2950", str(path),
-                 "-channel", channel, "-separate", "-format", "%[mean]", "info:"]).decode())
-                                for channel in ("Red", "Green", "Blue")]
+                 "-channel", channel, "-separate", "-format", "%[fx:mean]", "info:"]).decode())
+                        for channel in ("Red", "Green", "Blue"))
+            subprocess.check_call(["convert", str(path), "-evaluate", "divide", str(level),
+                                   str(calibration_file_path.parent/"kamscan_flatfield.pgm")])
+            path = call_dcraw(old_path, extra_raw=True)
+            subprocess.check_call(["convert", str(path), "-evaluate", "divide", str(level),
+                                   str(calibration_file_path.parent/"kamscan_flatfield.ppm")])
             one_image_processed = True
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
