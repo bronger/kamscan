@@ -181,7 +181,7 @@ def process_image(filepath, output_path):
     elif args.mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray"])
     elif args.mode == "mono":
-        convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-compress", "group4"])
+        convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
     tiff_filepath = filepath.with_suffix(".tiff")
     convert_call.append(str(tiff_filepath))
     subprocess.check_call(convert_call)
