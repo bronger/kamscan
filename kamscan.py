@@ -186,7 +186,7 @@ def process_image(filepath, output_path):
     convert_call.append(str(tiff_filepath))
     subprocess.check_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
-    subprocess.check_call(["tesseract", str(tiff_filepath), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "deu", "pdf"])
+    subprocess.check_call(["tesseract", str(tiff_filepath), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
     return pdf_filepath
 
 with tempfile.TemporaryDirectory() as tempdir:
