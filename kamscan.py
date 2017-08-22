@@ -210,7 +210,6 @@ with tempfile.TemporaryDirectory() as tempdir:
     for result in results:
         pdfs.append(result.get())
     pdfs.sort()
-
     subprocess.check_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-sOutputFile={}".format(args.filepath)] +
                           [str(pdf) for pdf in pdfs])
 
