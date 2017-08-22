@@ -129,8 +129,9 @@ def analyze_calibration_image():
         filepath = directory/filenames[0]
         raw_points = analyze_scan(2000, 3000, 0.1, filepath, 4)
         points = [analyze_scan(x, y, 1, filepath, 1)[0] for x, y in raw_points]
-        red, green, blue = [subprocess.check_output(["convert", "-extract", "100x100+1950+2950", str(filepath),
-                                                     "-channel", channel, "-separate", "-format", "%[mean]", "info:"])
+        red, green, blue = [float(subprocess.check_output(
+            ["convert", "-extract", "100x100+1950+2950", str(filepath),
+             "-channel", channel, "-separate", "-format", "%[mean]", "info:"]).decode())
                             for channel in ("Red", "Green", "Blue")]
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
