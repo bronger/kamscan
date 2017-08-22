@@ -29,8 +29,10 @@ class Camera:
     def __init__(self, correction_data=None):
         if correction_data:
             self.red, self.green, self.blue = correction_data.red, correction_data.green, correction_data.blue
+            self.exposure_correction = correction_data.exposure_correction
         else:
             self.red, self.green, self.blue = 2.986434, 1.000000, 1.248604
+            self.exposure_correction = 1
         with self._camera_connected():
             self.paths = self._collect_paths()
 
@@ -76,11 +78,12 @@ class Camera:
                 path = path_with_timestamp[1]
                 if path.suffix == ".ARW":
                     wait_for_excess_processes(processes)
-                    dcraw_call = "dcraw -c -t 5 -o 0 -M -g 1 1 -r {0} {1} {2} {1}".format(self.red, self.green, self.blue)
+                    dcraw_call = "dcraw -c -t 5 -o 0 -M -g 1 1 -r {0} {1} {2} {1} -b {3} ".format(
+                        self.red, self.green, self.blue, self.exposure_correction)
                     if args.mode in {"grey", "mono"}:
                         dcraw_call += " -d"
                     process = subprocess.Popen(
-                        [dcraw_call + " '{0}' > '{2}/{1:06}.ppm' && rm '{0}'".format(path, i, tempdir)], shell=True)
+                        [dcraw_call + " '{0}' > '{2}/{1:06}.pnm' && rm '{0}'".format(path, i, tempdir)], shell=True)
                     processes.add(process)
             wait_for_excess_processes(processes, max_processes=0)
             assert all(process.returncode == 0 for process in processes)
@@ -93,6 +96,7 @@ class CorrectionData:
     def __init__(self):
         self.coordinates = 8 * [None]
         self.red = self.green = self.blue = None
+        self.exposure_correction = None
 
     def coordinates_as_strings(self):
         return [str(coordinate) for coordinate in self.coordinates]
@@ -139,6 +143,7 @@ def analyze_calibration_image():
     correction_data.red = red * camera.red / green
     correction_data.green = camera.green
     correction_data.blue = blue * camera.blue / green
+    correction_data.exposure_correction = green / 65535
     return correction_data
 
 
