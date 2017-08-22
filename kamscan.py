@@ -53,35 +53,33 @@ class Camera:
                     result.add(filepath)
         return result
 
-    def images(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            tempdir = Path(tempdir)
-            print("Bitte Bilder machen.  Dann:")
-            with self._camera_connected():
-                paths = self._collect_paths()
-                new_paths = paths - self.paths
-                paths_with_timestamps = []
-                for path in new_paths:
-                    output = subprocess.check_output(
-                        ["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)]).decode().strip()
-                    paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
-                paths_with_timestamps.sort()
-                path_tripletts = set()
-                i = 0
-                for __, path in paths_with_timestamps:
-                    path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
-                    i += 1
-                rsync = subprocess.Popen(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)])
-                while path_tripletts:
-                    for triplett in path_tripletts:
-                        old_path, intermediate_path, destination = triplett
-                        if intermediate_path.exists():
-                            os.rename(str(intermediate_path), str(destination))
-                            os.remove(str(old_path))
-                            path_tripletts.remove(triplett)
-                            yield destination
-                            break
-                assert rsync.wait() == 0
+    def images(self, tempdir):
+        print("Bitte Bilder machen.  Dann:")
+        with self._camera_connected():
+            paths = self._collect_paths()
+            new_paths = paths - self.paths
+            paths_with_timestamps = []
+            for path in new_paths:
+                output = subprocess.check_output(
+                    ["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)]).decode().strip()
+                paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
+            paths_with_timestamps.sort()
+            path_tripletts = set()
+            i = 0
+            for __, path in paths_with_timestamps:
+                path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
+                i += 1
+            rsync = subprocess.Popen(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)])
+            while path_tripletts:
+                for triplett in path_tripletts:
+                    old_path, intermediate_path, destination = triplett
+                    if intermediate_path.exists():
+                        os.rename(str(intermediate_path), str(destination))
+                        os.remove(str(old_path))
+                        path_tripletts.remove(triplett)
+                        yield destination
+                        break
+            assert rsync.wait() == 0
 
 camera = Camera()
 
@@ -123,16 +121,18 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
 
 def analyze_calibration_image():
     one_image_processed = False
-    for old_path in camera.images():
-        assert not one_image_processed
-        path = call_dcraw(old_path, extra_raw=False)
-        raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
-        points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
-        red, green, blue = [float(subprocess.check_output(
-            ["convert", "-extract", "100x100+1950+2950", str(path),
-             "-channel", channel, "-separate", "-format", "%[mean]", "info:"]).decode())
-                            for channel in ("Red", "Green", "Blue")]
-        one_image_processed = True
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = Path(tempdir)
+        for old_path in camera.images(tempdir):
+            assert not one_image_processed
+            path = call_dcraw(old_path, extra_raw=False)
+            raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
+            points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
+            red, green, blue = [float(subprocess.check_output(
+                ["convert", "-extract", "100x100+1950+2950", str(path),
+                 "-channel", channel, "-separate", "-format", "%[mean]", "info:"]).decode())
+                                for channel in ("Red", "Green", "Blue")]
+            one_image_processed = True
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
     center_y = sum(point[1] for point in points) / len(points)
@@ -190,7 +190,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    for path in camera.images():
+    for path in camera.images(tempdir):
         results.add(pool.apply_async(process_image, (path, tempdir)))
     pool.close()
     pool.join()
