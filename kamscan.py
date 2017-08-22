@@ -114,7 +114,7 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     try:
         result = json.loads(output)
     except json.decoder.JSONDecodeError:
-        print("Invalid JSON: {}".repr(output))
+        print("Invalid JSON: {}".format(repr(output)))
         raise
     return result
 
