@@ -174,21 +174,26 @@ def process_image(filepath, output_path):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
-    subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), str(filepath), str(tempfile)])
-    os.rename(str(tempfile), str(filepath))
-    convert_call = ["convert", str(filepath)]
+    filepath_tiff = filepath.with_suffix(".tiff")
+    tempfile_tiff = tempfile.with_suffix(".tiff")
+    subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
+                           str(filepath), str(filepath_tiff)])
     if args.mode == "color":
-        convert_call.extend(["-profile", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
-                             "-set", "colorspace", "XYZ", "-colorspace", "sRGB"])
+        subprocess.check_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
+                               str(filepath_tiff), str(tempfile_tiff)])
+    else:
+        os.rename(str(filepath_tiff), str(tempfile_tiff))
+    convert_call = ["convert", str(tempfile_tiff)]
+    if args.mode == "color":
+        convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
     elif args.mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray"])
+        convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
     elif args.mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
-    tiff_filepath = filepath.with_suffix(".tiff")
-    convert_call.append(str(tiff_filepath))
+    convert_call.append(str(filepath_tiff))
     subprocess.check_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
-    subprocess.check_call(["tesseract", str(tiff_filepath), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
+    subprocess.check_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
     return pdf_filepath
 
 with tempfile.TemporaryDirectory() as tempdir:
