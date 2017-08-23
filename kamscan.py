@@ -103,14 +103,12 @@ class CorrectionData:
 
     def __init__(self):
         self.coordinates = 8 * [None]
-        self.exposure_correction = None
 
     def coordinates_as_strings(self):
         return [str(coordinate) for coordinate in self.coordinates]
 
     def __repr__(self):
-        return """links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}
-Belichtungskorrektur: {}""".format(*(self.coordinates + [self.exposure_correction]))
+        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coordinates)
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
@@ -130,15 +128,9 @@ def analyze_calibration_image():
             points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
 
             path = call_dcraw(old_path, extra_raw=True, gray=True)
-            level = max(float(subprocess.check_output(
-                ["convert", "-extract", "100x100+1950+2950", str(path),
-                 "-channel", channel, "-separate", "-format", "%[fx:mean]", "info:"]).decode())
-                        for channel in ("Red", "Green", "Blue"))
-            subprocess.check_call(["convert", str(path), "-evaluate", "divide", str(level),
-                                   str(calibration_file_path.parent/"kamscan_flatfield.pgm")])
+            shutil.move(str(path), str(calibration_file_path.parent/"kamscan_flatfield.pgm"))
             path = call_dcraw(old_path, extra_raw=True)
-            subprocess.check_call(["convert", str(path), "-evaluate", "divide", str(level),
-                                   str(calibration_file_path.parent/"kamscan_flatfield.ppm")])
+            shutil.move(str(path), str(calibration_file_path.parent/"kamscan_flatfield.ppm"))
             one_image_processed = True
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
@@ -154,7 +146,6 @@ def analyze_calibration_image():
                 correction_data.coordinates[2:4] = point
             else:
                 correction_data.coordinates[6:8] = point
-    correction_data.exposure_correction = 1 / level
     return correction_data
 
 
@@ -173,7 +164,7 @@ else:
 
 
 def process_image(filepath, output_path):
-    filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=correction_data.exposure_correction)
+    filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (calibration_file_path.parent/"kamscan_flatfield").with_suffix(
         ".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
