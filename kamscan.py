@@ -87,7 +87,7 @@ camera = Camera()
 def call_dcraw(path, extra_raw, gray=False, b=None):
     dcraw_call = ["dcraw", "-t", "5"]
     if extra_raw:
-        dcraw_call.extend(["-o", "0", "-M", "-g", "1", "1", "-r", "1", "1", "1", "1", "-W"])
+        dcraw_call.extend(["-o", "0", "-M", "-6", "-g", "1", "1", "-r", "1", "1", "1", "1", "-W"])
     if gray:
         dcraw_call.append("-d")
     if b is not None:
