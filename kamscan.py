@@ -174,7 +174,9 @@ def process_image(filepath, output_path):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
-    convert_call = ["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), str(filepath)]
+    subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), str(filepath), str(tempfile)])
+    os.rename(str(tempfile), str(filepath))
+    convert_call = ["convert", str(filepath)]
     if args.mode == "color":
         convert_call.extend(["-profile", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
                              "-set", "colorspace", "XYZ", "-colorspace", "sRGB"])
