@@ -10,8 +10,16 @@ calibration_file_path = Path.home()/"aktuell/kamscan_calibration.pickle"
 parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="take a calibration image")
 parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"}, help="colour mode of resulting pages")
+parser.add_argument("--full-height", type=float, help="height of full page in cm; defaults to 29.7")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
+
+if args.full_height is None:
+    page_height = 29.7
+elif args.calibration:
+    page_height = args.full_height
+else:
+    raise Exception("You can give --full-height only with --calibration.")
 
 
 def path_to_own_program(name):
@@ -103,7 +111,7 @@ class CorrectionData:
 
     def __init__(self):
         self.coordinates = 8 * [None]
-        self.height_in_cm = 29.7
+        self.height_in_cm = page_height
 
     def coordinates_as_strings(self):
         return [str(coordinate) for coordinate in self.coordinates]
