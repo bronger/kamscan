@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-calibration_file_path = Path.home()/"aktuell/kamscan_calibration.pickle"
+calibration_root = Path.home()/"aktuell"
 
 parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="take a calibration image")
@@ -13,8 +13,11 @@ parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"},
 parser.add_argument("--full-height", type=float, help="height of full page in cm; defaults to 29.7")
 parser.add_argument("--height", type=float, help="height of to-be-scanned area in cm; defaults to full page height")
 parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
+parser.add_argument("--profile", default="default", help="name of profile to use")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
+
+assert "/" not in args.profile
 
 if args.full_height is None:
     page_height = 29.7
@@ -142,9 +145,9 @@ def analyze_calibration_image():
             points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
 
             path = call_dcraw(old_path, extra_raw=True, gray=True)
-            shutil.move(str(path), str(calibration_file_path.parent/"kamscan_flatfield.pgm"))
+            shutil.move(str(path), str(calibration_root/"{}_kamscan_flatfield.pgm".format(args.profile)))
             path = call_dcraw(old_path, extra_raw=True)
-            shutil.move(str(path), str(calibration_file_path.parent/"kamscan_flatfield.ppm"))
+            shutil.move(str(path), str(calibration_root/"{}_kamscan_flatfield.ppm".format(args.profile)))
             one_image_processed = True
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
@@ -163,6 +166,9 @@ def analyze_calibration_image():
     return correction_data
 
 
+os.makedirs(str(calibration_root), exists_ok=True)
+calibration_file_path = calibration_root/"{}_calibration.pickle".format(args.profile)
+
 def get_correction_data():
     correction_data = analyze_calibration_image()
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
@@ -179,7 +185,7 @@ else:
 
 def process_image(filepath, output_path):
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
-    flatfield_path = (calibration_file_path.parent/"kamscan_flatfield").with_suffix(
+    flatfield_path = (calibration_root/"{}_kamscan_flatfield".format(args.profile)).with_suffix(
         ".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
     subprocess.check_call(["convert", str(filepath), str(flatfield_path), "-compose", "dividesrc", "-composite",
