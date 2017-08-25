@@ -11,6 +11,8 @@ parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="take a calibration image")
 parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"}, help="colour mode of resulting pages")
 parser.add_argument("--full-height", type=float, help="height of full page in cm; defaults to 29.7")
+parser.add_argument("--height", type=float, help="height of to-be-scanned area in cm; defaults to full page height")
+parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
 
@@ -186,6 +188,11 @@ def process_image(filepath, output_path):
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
                                 correction_data.coordinates_as_strings()).decode())
+    density = correction_data.density(height)
+    if args.height is not None:
+        height = args.height / 2.54 * density
+    if args.width is not None:
+        width = args.width / 2.54 * density
     filepath_tiff = filepath.with_suffix(".tiff")
     tempfile_tiff = tempfile.with_suffix(".tiff")
     subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
@@ -202,7 +209,7 @@ def process_image(filepath, output_path):
         convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
     elif args.mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
-    convert_call.extend(["-density", str(correction_data.density(height)), str(filepath_tiff)])
+    convert_call.extend(["-density", str(density), str(filepath_tiff)])
     subprocess.check_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
     subprocess.check_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
