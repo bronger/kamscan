@@ -1,5 +1,15 @@
 #!/usr/bin/python3
 
+"""Takes pictures with a photo camera and converts them to a PDF document.
+Currently, this is specific to my (Torsten Bronger) specific setup.  In
+particular, some things are hardcoded, e.g. the path to the input colour
+profile of the camera or the path of the mount point of the camera on my
+computer.  Also, the utility undistort.cc contains hardcoded things.
+
+This script must reside in the same director as its helpers ``undistort`` and
+``analyze_scan.py``.  It requires Python 3.5.
+"""
+
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,11 +38,23 @@ else:
 
 
 def path_to_own_program(name):
+    """Returns the path to an executable which resides in the same directory as
+    this script.
+
+    :param str name: name of the executable
+    :returns: full path to the executable
+    :rtype: Path
+    """
     return (Path(__file__).parent/name).resolve()
 
 
 class Camera:
+    """Class with abstracts the interface to a camera.
+    """
     path = Path("/media/bronger/3937-6637/DCIM")
+    """Path to the directory which contains the image files if the camera's storage
+    is mounted.  All subdirectories are searched for images as well.
+    """
 
     def __init__(self):
         with self._camera_connected():
