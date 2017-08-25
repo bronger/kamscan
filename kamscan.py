@@ -103,9 +103,13 @@ class CorrectionData:
 
     def __init__(self):
         self.coordinates = 8 * [None]
+        self.height_in_cm = 29.7
 
     def coordinates_as_strings(self):
         return [str(coordinate) for coordinate in self.coordinates]
+
+    def density(self, height_in_pixel):
+        return height_in_pixel / (self.height_in_cm / 2.54)
 
     def __repr__(self):
         return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coordinates)
@@ -190,7 +194,7 @@ def process_image(filepath, output_path):
         convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
     elif args.mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
-    convert_call.append(str(filepath_tiff))
+    convert_call.extend(["-density", str(correction_data.density(height)), str(filepath_tiff)])
     subprocess.check_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
     subprocess.check_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
