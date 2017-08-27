@@ -218,6 +218,7 @@ def analyze_calibration_image():
     return correction_data
 
 
+silent_call(["find", str(data_root), "-mindepth", "1", "-mtime", "+1", "-delete"])
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
 
