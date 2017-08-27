@@ -27,11 +27,15 @@ parser.add_argument("--width", type=float, help="width of to-be-scanned area in 
 parser.add_argument("--profile", default="default", help="name of profile to use")
 parser.add_argument("--debug", action="store_true", help="debug mode; in particular, don't suppress output of subprocesses")
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
+parser.add_argument("--two-side", action="store_true", help="whether two-side images should be assumed")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
 
 assert "/" not in args.profile
 profile_root = data_root/args.profile
+if args.two_side:
+    assert args.height is None and args.width is None
+    profile_root /= "two_side"
 
 if args.full_height is None:
     page_height = 29.7
@@ -266,9 +270,31 @@ def process_image(filepath, output_path):
                              "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", str(density), str(filepath_tiff)])
     silent_call(convert_call)
-    pdf_filepath = output_path/filepath.with_suffix(".pdf").name
-    silent_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", args.language, "pdf"])
-    return pdf_filepath
+    tiff_filepaths = set()
+    if args.two_side:
+        filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
+        filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
+        left = silent_call(["convert", "-extract", str(filepath_tiff), "{0}x{1}+0+0".format(width, height / 2),
+                            "-rotate", "-90", str(filepath_left_tiff)], asynchronous=True)
+        silent_call(["convert", "-extract", str(filepath_tiff), "{0}x{1}+0+{1}".format(width, height / 2), "-rotate", "-90",
+                     str(filepath_right_tiff)])
+        assert left.wait() == 0
+        shutil.copy(str(filepath_left_tiff), "/tmp")
+        shutil.copy(str(filepath_right_tiff), "/tmp")
+        tiff_filepaths.add(filepath_left_tiff)
+        tiff_filepaths.add(filepath_right_tiff)
+    else:
+        tiff_filepaths = {filepath_tiff}
+    result = set()
+    processes = set()
+    for path in tiff_filepaths:
+        pdf_filepath = output_path/path.with_suffix(".pdf").name
+        processes.add(silent_call(["tesseract", str(path), str(pdf_filepath.parent/pdf_filepath.stem),
+                                   "-l", args.language, "pdf"], asynchronous=True))
+        result.add(pdf_filepath)
+    for process in processes:
+        assert process.wait() == 0
+    return result
 
 with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
@@ -281,7 +307,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     pool.join()
     pdfs = []
     for result in results:
-        pdfs.append(result.get())
+        pdfs.extend(result.get())
     pdfs.sort()
     silent_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-sOutputFile={}".format(args.filepath)] +
                 [str(pdf) for pdf in pdfs])
