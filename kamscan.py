@@ -60,8 +60,14 @@ def silent():
     """
     return open(os.devnull, "w") if not args.debug else None
 
-def silent_call(arguments):
-    subprocess.check_call(arguments, stdout=silent(), stderr=silent())
+def silent_call(arguments, asynchronous=False, swallow_stdout=True):
+    kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True}
+    if asynchronous:
+        return subprocess.Popen(arguments, **kwargs)
+    else:
+        kwargs["check"] = True
+        return subprocess.run(arguments, **kwargs)
+
 
 class Camera:
     """Class with abstracts the interface to a camera.
@@ -111,8 +117,8 @@ class Camera:
             new_paths = paths - self.paths
             paths_with_timestamps = []
             for path in new_paths:
-                output = subprocess.check_output(
-                    ["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)], stderr=silent()).decode().strip()
+                output = silent_call(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)],
+                                     swallow_stdout=False).stdout.strip()
                 paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
             paths_with_timestamps.sort()
             path_tripletts = set()
@@ -120,8 +126,7 @@ class Camera:
             for __, path in paths_with_timestamps:
                 path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
                 i += 1
-            rsync = subprocess.Popen(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)],
-                                     stdout=silent(), stderr=silent())
+            rsync = silent_call(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)], asynchronous=True)
             while path_tripletts:
                 for triplett in path_tripletts:
                     old_path, intermediate_path, destination = triplett
@@ -146,11 +151,10 @@ def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
         dcraw_call.extend(["-b", str(b)])
     dcraw_call.append(str(path))
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
+    dcraw = silent_call(dcraw_call, asynchronous)
     if asynchronous:
-        dcraw = subprocess.Popen(dcraw_call, stdout=silent(), stderr=silent())
         return output_path, dcraw
     else:
-        silent_call(dcraw_call)
         assert output_path.exists()
         return output_path
 
@@ -172,8 +176,8 @@ class CorrectionData:
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
-    output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
-                                      str(filepath), str(number_of_points)], stderr=silent()).decode()
+    output = silent_call([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
+                          str(filepath), str(number_of_points)], swallow_stdout=False).stdout
     result = json.loads(output)
     return result
 
@@ -236,8 +240,8 @@ def process_image(filepath, output_path):
                            str(tempfile)])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
-        subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
-                                correction_data.coordinates_as_strings(), stderr=silent()).decode())
+        silent_call([str(path_to_own_program("undistort")), str(filepath)] + correction_data.coordinates_as_strings(),
+                    swallow_stdout=False).stdout)
     density = correction_data.density(height)
     if args.height is not None:
         height = args.height / 2.54 * density
