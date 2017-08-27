@@ -199,6 +199,7 @@ os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
 
 def get_correction_data():
+    print("Kalibrationsbild ist nötig …")
     correction_data = analyze_calibration_image()
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
