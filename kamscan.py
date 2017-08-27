@@ -71,15 +71,16 @@ class Camera:
                 time.sleep(1)
 
     @contextmanager
-    def _camera_connected(self):
+    def _camera_connected(self, wait_for_disconnect=True):
         if not self.path_exists():
             print("Bitte Kamera einstöpseln.")
         while not self.path_exists():
             time.sleep(1)
         yield
-        print("Bitte Kamera ausstöpseln.")
-        while self.path_exists():
-            time.sleep(1)        
+        if wait_for_disconnect:
+            print("Bitte Kamera ausstöpseln.")
+            while self.path_exists():
+                time.sleep(1)
 
     def _collect_paths(self):
         result = set()
@@ -90,9 +91,9 @@ class Camera:
                     result.add(filepath)
         return result
 
-    def images(self, tempdir):
+    def images(self, tempdir, wait_for_disconnect=True):
         print("Bitte Bilder machen.  Dann:")
-        with self._camera_connected():
+        with self._camera_connected(wait_for_disconnect):
             paths = self._collect_paths()
             new_paths = paths - self.paths
             paths_with_timestamps = []
@@ -254,7 +255,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    for path in camera.images(tempdir):
+    for path in camera.images(tempdir, wait_for_disconnect=False):
         results.add(pool.apply_async(process_image, (path, tempdir)))
     daemon.DaemonContext().open()
     pool.close()
