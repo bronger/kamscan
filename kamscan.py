@@ -256,7 +256,7 @@ def process_image(filepath, output_path):
     if args.mode == "color":
         convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
     elif args.mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
+        convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
     elif args.mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", str(density), str(filepath_tiff)])
