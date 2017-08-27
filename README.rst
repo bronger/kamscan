@@ -19,7 +19,7 @@ You need
 - Python 3.5
 - Lensfun (modifier_api branch)
 - gcc
-- Tesseract 3.0.9
+- Tesseract 3.0.5
 - ImageMagick 6.8
 - Argyll CMS (in particular, cctiff)
 - dcraw
