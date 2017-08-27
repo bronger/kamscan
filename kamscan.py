@@ -258,7 +258,8 @@ def process_image(filepath, output_path):
     elif args.mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
     elif args.mode == "mono":
-        convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
+        convert_call.extend(["-level", "0,75%", "-set",
+                             "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", str(density), str(filepath_tiff)])
     silent_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
