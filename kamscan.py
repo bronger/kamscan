@@ -66,6 +66,7 @@ def silent():
 
 def silent_call(arguments, asynchronous=False, swallow_stdout=True):
     kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True}
+    arguments = list(map(str, arguments))
     if asynchronous:
         return subprocess.Popen(arguments, **kwargs)
     else:
@@ -121,7 +122,7 @@ class Camera:
             new_paths = paths - self.paths
             paths_with_timestamps = []
             for path in new_paths:
-                output = silent_call(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)],
+                output = silent_call(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", path],
                                      swallow_stdout=False).stdout.strip()
                 paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
             paths_with_timestamps.sort()
@@ -130,7 +131,7 @@ class Camera:
             for __, path in paths_with_timestamps:
                 path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
                 i += 1
-            rsync = silent_call(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)], asynchronous=True)
+            rsync = silent_call(["rsync"] + [path[0] for path in path_tripletts] + [tempdir], asynchronous=True)
             while path_tripletts:
                 for triplett in path_tripletts:
                     old_path, intermediate_path, destination = triplett
@@ -146,13 +147,13 @@ camera = Camera()
 
 
 def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
-    dcraw_call = ["dcraw", "-t", "5"]
+    dcraw_call = ["dcraw", "-t", 5]
     if extra_raw:
-        dcraw_call.extend(["-o", "0", "-M", "-6", "-g", "1", "1", "-r", "1", "1", "1", "1", "-W"])
+        dcraw_call.extend(["-o", 0, "-M", "-6", "-g", 1, 1, "-r", 1, 1, 1, 1, "-W"])
     if gray:
         dcraw_call.append("-d")
     if b is not None:
-        dcraw_call.extend(["-b", str(b)])
+        dcraw_call.extend(["-b", b])
     dcraw_call.append(str(path))
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
     dcraw = silent_call(dcraw_call, asynchronous)
@@ -180,8 +181,8 @@ class CorrectionData:
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
-    output = silent_call([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
-                          str(filepath), str(number_of_points)], swallow_stdout=False).stdout
+    output = silent_call([path_to_own_program("analyze_scan.py"), x, y, scaling, filepath, number_of_points],
+                         swallow_stdout=False).stdout
     result = json.loads(output)
     return result
 
@@ -218,7 +219,7 @@ def analyze_calibration_image():
     return correction_data
 
 
-silent_call(["find", str(data_root), "-mindepth", "1", "-mtime", "+1", "-delete"])
+silent_call(["find", data_root, "-mindepth", 1, "-mtime", "+1", "-delete"])
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
 
@@ -241,11 +242,10 @@ def process_image(filepath, output_path):
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
-    silent_call(["convert", str(filepath), str(flatfield_path), "-compose", "dividesrc", "-composite",
-                           str(tempfile)])
+    silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
-        silent_call([str(path_to_own_program("undistort")), str(filepath)] + correction_data.coordinates_as_strings(),
+        silent_call([path_to_own_program("undistort"), filepath] + correction_data.coordinates_as_strings(),
                     swallow_stdout=False).stdout)
     density = correction_data.density(height)
     if args.height is not None:
@@ -254,14 +254,12 @@ def process_image(filepath, output_path):
         width = args.width / 2.54 * density
     filepath_tiff = filepath.with_suffix(".tiff")
     tempfile_tiff = tempfile.with_suffix(".tiff")
-    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
-                           str(filepath), str(filepath_tiff)])
+    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
     if args.mode == "color":
-        silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
-                               str(filepath_tiff), str(tempfile_tiff)])
+        silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
-    convert_call = ["convert", str(tempfile_tiff), "-linear-stretch", "2%x1%"]
+    convert_call = ["convert", tempfile_tiff, "-linear-stretch", "2%x1%"]
     if args.mode == "color":
         convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
     elif args.mode == "gray":
@@ -269,16 +267,16 @@ def process_image(filepath, output_path):
     elif args.mode == "mono":
         convert_call.extend(["-level", "0,75%", "-set",
                              "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
-    convert_call.extend(["-density", str(density), str(filepath_tiff)])
+    convert_call.extend(["-density", density, filepath_tiff])
     silent_call(convert_call)
     tiff_filepaths = set()
     if args.two_side:
         filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
         filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
-        left = silent_call(["convert", "-extract", str(filepath_tiff), "{0}x{1}+0+0".format(width, height / 2),
-                            "-rotate", "-90", str(filepath_left_tiff)], asynchronous=True)
-        silent_call(["convert", "-extract", str(filepath_tiff), "{0}x{1}+0+{1}".format(width, height / 2), "-rotate", "-90",
-                     str(filepath_right_tiff)])
+        left = silent_call(["convert", "-extract", filepath_tiff, "{0}x{1}+0+0".format(width, height / 2), "-rotate", "-90",
+                            filepath_left_tiff], asynchronous=True)
+        silent_call(["convert", "-extract", filepath_tiff, "{0}x{1}+0+{1}".format(width, height / 2), "-rotate", "-90",
+                     filepath_right_tiff])
         assert left.wait() == 0
         shutil.copy(str(filepath_left_tiff), "/tmp")
         shutil.copy(str(filepath_right_tiff), "/tmp")
@@ -290,8 +288,8 @@ def process_image(filepath, output_path):
     processes = set()
     for path in tiff_filepaths:
         pdf_filepath = output_path/path.with_suffix(".pdf").name
-        processes.add(silent_call(["tesseract", str(path), str(pdf_filepath.parent/pdf_filepath.stem),
-                                   "-l", args.language, "pdf"], asynchronous=True))
+        processes.add(silent_call(["tesseract", path, pdf_filepath.parent/pdf_filepath.stem, "-l", args.language, "pdf"],
+                                  asynchronous=True))
         result.add(pdf_filepath)
     for process in processes:
         assert process.wait() == 0
@@ -311,6 +309,6 @@ with tempfile.TemporaryDirectory() as tempdir:
         pdfs.extend(result.get())
     pdfs.sort()
     silent_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-sOutputFile={}".format(args.filepath)] +
-                [str(pdf) for pdf in pdfs])
+                [pdf for pdf in pdfs])
 
-silent_call(["evince", str(args.filepath)])
+silent_call(["evince", args.filepath])
