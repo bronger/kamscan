@@ -187,21 +187,23 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
-    one_image_processed = False
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
-        for old_path in camera.images(tempdir):
-            assert not one_image_processed
-            path = call_dcraw(old_path, extra_raw=False)
-            raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
-            points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
-
-            path_gray, dcraw_gray = call_dcraw(old_path, extra_raw=True, gray=True, asynchronous=True)
-            path = call_dcraw(old_path, extra_raw=True)
-            shutil.move(str(path), str(profile_root/"flatfield.ppm"))
-            assert dcraw_gray.wait() == 0
-            shutil.move(str(path_gray), str(profile_root/"flatfield.pgm"))
-            one_image_processed = True
+        for index, path in enumerate(camera.images(tempdir)):
+            if index == 0:
+                path_color, dcraw_color = call_dcraw(path, extra_raw=True, asynchronous=True)
+                path_gray, dcraw_gray = call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
+            elif index == 1:
+                ppm_path = call_dcraw(path, extra_raw=False)
+                raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
+                points = [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
+            else:
+                raise Exception("More than one calibration image found.")
+        assert index == 1
+        assert dcraw_color.wait() == 0
+        assert dcraw_gray.wait() == 0
+        shutil.move(str(path_color), str(profile_root/"flatfield.ppm"))
+        shutil.move(str(path_gray), str(profile_root/"flatfield.pgm"))
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
     center_y = sum(point[1] for point in points) / len(points)
@@ -224,7 +226,7 @@ os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
 
 def get_correction_data():
-    print("Kalibrationsbild ist nötig …")
+    print("Kalibrationsbild ist nötig.  Erst das Flatfield, dann für die Position …")
     correction_data = analyze_calibration_image()
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
