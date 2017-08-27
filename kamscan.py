@@ -189,7 +189,7 @@ def analyze_calibration_image():
     return correction_data
 
 
-os.makedirs(str(calibration_root), exists_ok=True)
+os.makedirs(str(calibration_root), exist_ok=True)
 calibration_file_path = calibration_root/"{}_calibration.pickle".format(args.profile)
 
 def get_correction_data():
