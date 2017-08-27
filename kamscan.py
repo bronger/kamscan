@@ -24,6 +24,7 @@ parser.add_argument("--full-height", type=float, help="height of full page in cm
 parser.add_argument("--height", type=float, help="height of to-be-scanned area in cm; defaults to full page height")
 parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
 parser.add_argument("--profile", default="default", help="name of profile to use")
+parser.add_argument("--debug", action="store_true", help="debug mode; in particular, don't suppress output of subprocesses")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
 
@@ -48,6 +49,17 @@ def path_to_own_program(name):
     """
     return (Path(__file__).parent/name).resolve()
 
+
+def silent():
+    """Used in subprocess calls to redirect stdout or stderr to ``/dev/null``,
+    as in::
+
+        subprocess.check_call([...], stderr=silent())
+    """
+    return open(os.devnull, "w") if not args.debug else None
+
+def silent_call(arguments):
+    subprocess.check_call(arguments, stdout=silent(), stderr=silent())
 
 class Camera:
     """Class with abstracts the interface to a camera.
@@ -98,7 +110,7 @@ class Camera:
             paths_with_timestamps = []
             for path in new_paths:
                 output = subprocess.check_output(
-                    ["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)]).decode().strip()
+                    ["exiv2", "-g", "Exif.Photo.DateTimeOriginal", str(path)], stderr=silent()).decode().strip()
                 paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
             paths_with_timestamps.sort()
             path_tripletts = set()
@@ -106,7 +118,8 @@ class Camera:
             for __, path in paths_with_timestamps:
                 path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
                 i += 1
-            rsync = subprocess.Popen(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)])
+            rsync = subprocess.Popen(["rsync"] + [str(path[0]) for path in path_tripletts] + [str(tempdir)],
+                                     stdout=silent(), stderr=silent())
             while path_tripletts:
                 for triplett in path_tripletts:
                     old_path, intermediate_path, destination = triplett
@@ -132,10 +145,10 @@ def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
     dcraw_call.append(str(path))
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
     if asynchronous:
-        dcraw = subprocess.Popen(dcraw_call)
+        dcraw = subprocess.Popen(dcraw_call, stdout=silent(), stderr=silent())
         return output_path, dcraw
     else:
-        subprocess.check_call(dcraw_call)
+        silent_call(dcraw_call)
         assert output_path.exists()
         return output_path
 
@@ -158,7 +171,7 @@ class CorrectionData:
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
     output = subprocess.check_output([str(path_to_own_program("analyze_scan.py")), str(x), str(y), str(scaling),
-                                      str(filepath), str(number_of_points)]).decode()
+                                      str(filepath), str(number_of_points)], stderr=silent()).decode()
     result = json.loads(output)
     return result
 
@@ -217,12 +230,12 @@ def process_image(filepath, output_path):
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
-    subprocess.check_call(["convert", str(filepath), str(flatfield_path), "-compose", "dividesrc", "-composite",
+    silent_call(["convert", str(filepath), str(flatfield_path), "-compose", "dividesrc", "-composite",
                            str(tempfile)])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
         subprocess.check_output([str(path_to_own_program("undistort")), str(filepath)] +
-                                correction_data.coordinates_as_strings()).decode())
+                                correction_data.coordinates_as_strings(), stderr=silent()).decode())
     density = correction_data.density(height)
     if args.height is not None:
         height = args.height / 2.54 * density
@@ -230,10 +243,10 @@ def process_image(filepath, output_path):
         width = args.width / 2.54 * density
     filepath_tiff = filepath.with_suffix(".tiff")
     tempfile_tiff = tempfile.with_suffix(".tiff")
-    subprocess.check_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
+    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
                            str(filepath), str(filepath_tiff)])
     if args.mode == "color":
-        subprocess.check_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
+        silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc",
                                str(filepath_tiff), str(tempfile_tiff)])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
@@ -245,9 +258,9 @@ def process_image(filepath, output_path):
     elif args.mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", str(density), str(filepath_tiff)])
-    subprocess.check_call(convert_call)
+    silent_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
-    subprocess.check_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
+    silent_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
     return pdf_filepath
 
 with tempfile.TemporaryDirectory() as tempdir:
@@ -263,7 +276,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     for result in results:
         pdfs.append(result.get())
     pdfs.sort()
-    subprocess.check_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-sOutputFile={}".format(args.filepath)] +
-                          [str(pdf) for pdf in pdfs])
+    silent_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-sOutputFile={}".format(args.filepath)] +
+                [str(pdf) for pdf in pdfs])
 
-subprocess.check_call(["evince", str(args.filepath)])
+silent_call(["evince", str(args.filepath)])
