@@ -18,8 +18,9 @@ from pathlib import Path
 data_root = Path.home()/"aktuell/kamscan"
 
 parser = argparse.ArgumentParser(description="Scan a document.")
-parser.add_argument("--calibration", action="store_true", help="take a calibration image")
-parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"}, help="colour mode of resulting pages")
+parser.add_argument("--calibration", action="store_true", help="force taking a calibration image")
+parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"},
+                    help="colour mode of resulting pages; defaults to mono")
 parser.add_argument("--full-height", type=float, help="height of full page in cm; defaults to 29.7")
 parser.add_argument("--height", type=float, help="height of to-be-scanned area in cm; defaults to full page height")
 parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
