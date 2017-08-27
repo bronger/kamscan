@@ -23,6 +23,7 @@ You need
 - ImageMagick 6.8
 - Argyll CMS (in particular, cctiff)
 - dcraw
+- Python-daemon
 
 
 Installation

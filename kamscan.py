@@ -13,6 +13,7 @@ This script must reside in the same director as its helpers ``undistort`` and
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime
 from contextlib import contextmanager
 from pathlib import Path
+import daemon
 
 
 calibration_root = Path.home()/"aktuell"
@@ -249,6 +250,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     results = set()
     for path in camera.images(tempdir):
         results.add(pool.apply_async(process_image, (path, tempdir)))
+    daemon.DaemonContext().open()
     pool.close()
     pool.join()
     pdfs = []
