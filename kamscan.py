@@ -13,7 +13,6 @@ This script must reside in the same director as its helpers ``undistort`` and
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime
 from contextlib import contextmanager
 from pathlib import Path
-import daemon
 
 
 data_root = Path.home()/"aktuell/kamscan"
@@ -257,7 +256,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     results = set()
     for path in camera.images(tempdir, wait_for_disconnect=False):
         results.add(pool.apply_async(process_image, (path, tempdir)))
-    daemon.DaemonContext().open()
+    print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
     pool.close()
     pool.join()
     pdfs = []
