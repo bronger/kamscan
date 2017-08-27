@@ -252,7 +252,7 @@ def process_image(filepath, output_path):
                                str(filepath_tiff), str(tempfile_tiff)])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
-    convert_call = ["convert", str(tempfile_tiff)]
+    convert_call = ["convert", str(tempfile_tiff), "-linear-stretch", "2%x1%"]
     if args.mode == "color":
         convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
     elif args.mode == "gray":
