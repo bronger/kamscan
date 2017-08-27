@@ -25,6 +25,7 @@ parser.add_argument("--height", type=float, help="height of to-be-scanned area i
 parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
 parser.add_argument("--profile", default="default", help="name of profile to use")
 parser.add_argument("--debug", action="store_true", help="debug mode; in particular, don't suppress output of subprocesses")
+parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
 
@@ -260,7 +261,7 @@ def process_image(filepath, output_path):
     convert_call.extend(["-density", str(density), str(filepath_tiff)])
     silent_call(convert_call)
     pdf_filepath = output_path/filepath.with_suffix(".pdf").name
-    silent_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", "eng", "pdf"])
+    silent_call(["tesseract", str(filepath_tiff), str(pdf_filepath.parent/pdf_filepath.stem), "-l", args.language, "pdf"])
     return pdf_filepath
 
 with tempfile.TemporaryDirectory() as tempdir:
