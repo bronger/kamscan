@@ -121,7 +121,7 @@ class Camera:
 camera = Camera()
 
 
-def call_dcraw(path, extra_raw, gray=False, b=None):
+def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
     dcraw_call = ["dcraw", "-t", "5"]
     if extra_raw:
         dcraw_call.extend(["-o", "0", "-M", "-6", "-g", "1", "1", "-r", "1", "1", "1", "1", "-W"])
@@ -130,10 +130,14 @@ def call_dcraw(path, extra_raw, gray=False, b=None):
     if b is not None:
         dcraw_call.extend(["-b", str(b)])
     dcraw_call.append(str(path))
-    subprocess.check_call(dcraw_call)
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
-    assert output_path.exists()
-    return output_path
+    if asynchronous:
+        dcraw = subprocess.Popen(dcraw_call)
+        return output_path, dcraw
+    else:
+        subprocess.check_call(dcraw_call)
+        assert output_path.exists()
+        return output_path
 
 
 class CorrectionData:
@@ -168,10 +172,11 @@ def analyze_calibration_image():
             raw_points = analyze_scan(2000, 3000, 0.1, path, 4)
             points = [analyze_scan(x, y, 1, path, 1)[0] for x, y in raw_points]
 
-            path = call_dcraw(old_path, extra_raw=True, gray=True)
-            shutil.move(str(path), str(profile_root/"flatfield.pgm"))
+            path_gray, dcraw_gray = call_dcraw(old_path, extra_raw=True, gray=True, asynchronous=True)
             path = call_dcraw(old_path, extra_raw=True)
             shutil.move(str(path), str(profile_root/"flatfield.ppm"))
+            assert dcraw_gray.wait() == 0
+            shutil.move(str(path_gray), str(profile_root/"flatfield.pgm"))
             one_image_processed = True
     correction_data = CorrectionData()
     center_x = sum(point[0] for point in points) / len(points)
