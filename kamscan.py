@@ -290,10 +290,8 @@ def process_image(filepath, page_index, output_path):
                          "-rotate", "-90", filepath_right_tiff])
         if page_index != 0:
             assert left.wait() == 0
-            shutil.copy(str(filepath_left_tiff), "/tmp")
             tiff_filepaths.add(filepath_left_tiff)
         if page_index != -1:
-            shutil.copy(str(filepath_right_tiff), "/tmp")
             tiff_filepaths.add(filepath_right_tiff)
     else:
         tiff_filepaths = {filepath_tiff}
