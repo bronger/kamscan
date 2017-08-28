@@ -247,7 +247,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Failed to activate undistortion\n";
         return -1;
     }
-    if (image.components == 3)
+    if (image.channels == 3)
         if (!modifier.EnableTCACorrection(lens, 50)) {
             std::cerr << "Failed to activate un-TCA\n";
             return -1;
