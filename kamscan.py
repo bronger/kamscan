@@ -174,9 +174,6 @@ class CorrectionData:
         self.coordinates = 8 * [None]
         self.height_in_cm = page_height
 
-    def coordinates_as_strings(self):
-        return [str(coordinate) for coordinate in self.coordinates]
-
     def density(self, height_in_pixel):
         return height_in_pixel / (self.height_in_cm / 2.54)
 
@@ -258,8 +255,7 @@ def process_image(filepath, page_index, output_path):
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
-        silent_call([path_to_own_program("undistort"), filepath] + correction_data.coordinates_as_strings(),
-                    swallow_stdout=False).stdout)
+        silent_call([path_to_own_program("undistort"), filepath] + correction_data.coordinates, swallow_stdout=False).stdout)
     density = correction_data.density(height)
     if args.height is not None:
         height = (args.width if args.two_side else args.height) / 2.54 * density
