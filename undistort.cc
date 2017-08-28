@@ -13,7 +13,7 @@ public:
     int channels;
     int components;
     lfPixelFormat pixel_format;
-    std::vector<char> data;
+    std::vector<unsigned char> data;
 
     Image(int width, int height, lfPixelFormat pixel_format, int channels);
     Image() {};
@@ -51,13 +51,21 @@ int Image::get(int x, int y, int channel) {
     if (x < 0 || x >= width || y < 0 || y >= height)
         return 0;
     int position = channel_size * (channels * (y * width + x) + channel);
-    return int(data[position]);
+    int result = static_cast<int>(data[position]);
+    if (channel_size == 2)
+        result = (result << 8) + static_cast<int>(data[position + 1]);
+    return result;
 }
 
 void Image::set(int x, int y, int channel, int value) {
     if (x >= 0 && x < width && y >= 0 && y < height) {
         int position = channel_size * (channels * (y * width + x) + channel);
-        data[position] = char(value);
+        if (channel_size == 1)
+            data[position] = static_cast<unsigned char>(value);
+        else if (channel_size == 2) {
+            data[position] = static_cast<unsigned char>(value >> 8);
+            data[position + 1] = static_cast<unsigned char>(value & 256);
+        }
     }
 }
 
@@ -91,7 +99,7 @@ std::istream& operator >>(std::istream &inputStream, Image &other)
     }
     size_t size = other.width * other.height * other.channel_size * other.channels;
     other.data.resize(size);
-    inputStream.read(other.data.data(), size);
+    inputStream.read(reinterpret_cast<char*>(other.data.data()), size);
     return inputStream;
 }
 
@@ -101,7 +109,7 @@ std::ostream& operator <<(std::ostream &outputStream, const Image &other)
                  << other.width << " "
                  << other.height << "\n"
                  << (other.pixel_format == LF_PF_U8 ? "255" : "65535") << "\n";
-    outputStream.write(other.data.data(), other.data.size());
+    outputStream.write(reinterpret_cast<const char*>(other.data.data()), other.data.size());
     return outputStream;
 }
 
@@ -201,14 +209,14 @@ int main(int argc, char* argv[]) {
     for (int x = 0; x < image.width; x++)
         for (int y = 0; y < image.height; y++) {
             int position = 2 * image.channels * (y * image.width + x);
-            int source_x_R = int(res[position]);
-            int source_y_R = int(res[position + 1]);
+            int source_x_R = static_cast<int>(res[position]);
+            int source_y_R = static_cast<int>(res[position + 1]);
             new_image.set(x, y, 0, image.get(source_x_R, source_y_R, 0));
             if (image.channels == 3) {
-                int source_x_G = int(res[position + 2]);
-                int source_y_G = int(res[position + 3]);
-                int source_x_B = int(res[position + 4]);
-                int source_y_B = int(res[position + 5]);
+                int source_x_G = static_cast<int>(res[position + 2]);
+                int source_y_G = static_cast<int>(res[position + 3]);
+                int source_x_B = static_cast<int>(res[position + 4]);
+                int source_y_B = static_cast<int>(res[position + 5]);
                 new_image.set(x, y, 1, image.get(source_x_G, source_y_G, 1));
                 new_image.set(x, y, 2, image.get(source_x_B, source_y_B, 2));
             }
