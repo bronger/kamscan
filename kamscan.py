@@ -186,8 +186,10 @@ class CorrectionData:
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
-    output = silent_call([path_to_own_program("analyze_scan.py"), x, y, scaling, filepath, number_of_points],
-                         swallow_stdout=False).stdout
+    def clamp(x, max_):
+        return min(max(x, 0), max_ - 1)
+    output = silent_call([path_to_own_program("analyze_scan.py"), clamp(x, 4000), clamp(y, 6000), scaling,
+                          filepath, number_of_points], swallow_stdout=False).stdout
     result = json.loads(output)
     return result
 
