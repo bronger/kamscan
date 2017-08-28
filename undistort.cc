@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <cmath>
 #include "lensfun.h"
 
 class Image {
@@ -18,6 +19,7 @@ public:
     Image(int width, int height, lfPixelFormat pixel_format, int channels);
     Image() {};
     int get(int x, int y, int channel);
+    int get(float x, float y, int channel);
     void set(int x, int y, int channel, int value);
 };
 
@@ -55,6 +57,21 @@ int Image::get(int x, int y, int channel) {
     if (channel_size == 2)
         result = (result << 8) + static_cast<int>(data[position + 1]);
     return result;
+}
+
+int Image::get(float x, float y, int channel) {
+    float dummy;
+    int x0 = static_cast<int>(x);
+    int y0 = static_cast<int>(y);
+    float i0 = static_cast<float>(get(x0, y0, channel));
+    float i1 = static_cast<float>(get(x0 + 1, y0, channel));
+    float i2 = static_cast<float>(get(x0, y0 + 1, channel));
+    float i3 = static_cast<float>(get(x0 + 1, y0 + 1, channel));
+    float fraction_x = std::modf(x, &dummy);
+    float i01 = (1 - fraction_x) * i0 + fraction_x * i1;
+    float i23 = (1 - fraction_x) * i2 + fraction_x * i3;
+    float fraction_y = std::modf(y, &dummy);
+    return static_cast<int>(std::round((1 - fraction_y) * i01 + fraction_y * i23));
 }
 
 void Image::set(int x, int y, int channel, int value) {
@@ -209,14 +226,14 @@ int main(int argc, char* argv[]) {
     for (int x = 0; x < image.width; x++)
         for (int y = 0; y < image.height; y++) {
             int position = 2 * image.channels * (y * image.width + x);
-            int source_x_R = static_cast<int>(res[position]);
-            int source_y_R = static_cast<int>(res[position + 1]);
+            float source_x_R = res[position];
+            float source_y_R = res[position + 1];
             new_image.set(x, y, 0, image.get(source_x_R, source_y_R, 0));
             if (image.channels == 3) {
-                int source_x_G = static_cast<int>(res[position + 2]);
-                int source_y_G = static_cast<int>(res[position + 3]);
-                int source_x_B = static_cast<int>(res[position + 4]);
-                int source_y_B = static_cast<int>(res[position + 5]);
+                float source_x_G = res[position + 2];
+                float source_y_G = res[position + 3];
+                float source_x_B = res[position + 4];
+                float source_y_B = res[position + 5];
                 new_image.set(x, y, 1, image.get(source_x_G, source_y_G, 1));
                 new_image.set(x, y, 2, image.get(source_x_B, source_y_B, 2));
             }
