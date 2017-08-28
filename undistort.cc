@@ -46,15 +46,6 @@
   In case of 2 bytes per channel, network byte order is assumed. */
 class Image {
 public:
-    int width, height; ///< width and height of the image in pixels
-    int channel_size; ///< width of one channel in bytes; may be 1 or 2
-    int channels; ///< number of channels; may be 1 (greyscale) or 3 (RGB)
-    int components; ///< channel description; used by Lensfun internally
-    lfPixelFormat pixel_format; ///< channel_size à la Lensfun
-    /** the raw data (1:1 dump of the PNM content, without header)
-     */
-    std::vector<unsigned char> data;
-
     Image(int width, int height, lfPixelFormat pixel_format, int channels);
     Image() {};
     /** Get the channel intensity at a certian coordinate.
@@ -87,6 +78,18 @@ public:
         position
      */
     void set(int x, int y, int channel, int value);
+    int width, height; ///< width and height of the image in pixels
+    int channels; ///< number of channels; may be 1 (greyscale) or 3 (RGB)
+    int components; ///< channel description; used by Lensfun internally
+    lfPixelFormat pixel_format; ///< channel_size à la Lensfun
+    /** the raw data (1:1 dump of the PNM content, without header)
+     */
+    std::vector<unsigned char> data;
+
+private:
+    friend std::istream& operator >>(std::istream &inputStream, Image &other);
+    friend std::ostream& operator <<(std::ostream &outputStream, const Image &other);
+    int channel_size; ///< width of one channel in bytes; may be 1 or 2
 };
 
 Image::Image(int width, int height, lfPixelFormat pixel_format, int channels) :
