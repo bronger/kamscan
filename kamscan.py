@@ -100,12 +100,12 @@ class Camera:
     @contextmanager
     def _camera_connected(self, wait_for_disconnect=True):
         if not self.path_exists():
-            print("Bitte Kamera einstöpseln.")
+            print("Please plug-in camera.")
         while not self.path_exists():
             time.sleep(1)
         yield
         if wait_for_disconnect:
-            print("Bitte Kamera ausstöpseln.")
+            print("Please unplug camera.")
             while self.path_exists():
                 time.sleep(1)
 
@@ -119,7 +119,7 @@ class Camera:
         return result
 
     def images(self, tempdir, wait_for_disconnect=True):
-        print("Bitte Bilder machen.  Dann:")
+        print("Please take pictures.  Then:")
         with self._camera_connected(wait_for_disconnect):
             paths = self._collect_paths()
             new_paths = paths - self.paths
@@ -238,7 +238,7 @@ prune_profiles()
 calibration_file_path = profile_root/"calibration.pickle"
 
 def get_correction_data():
-    print("Kalibrationsbild ist nötig.  Erst das Flatfield, dann für die Position …")
+    print("Calibration is necessary.  First the flat field, then for the position …")
     correction_data = analyze_calibration_image()
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
