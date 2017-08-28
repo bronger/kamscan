@@ -221,8 +221,13 @@ def analyze_calibration_image():
     return correction_data
 
 
-silent_call(["find", data_root, "-mindepth", 1, "-mtime", "+1", "-delete"])
+def prune_profiles():
+    now = datetime.datetime.now()
+    minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
+    minutes = max(minutes, 4 * 60)
+    silent_call(["find", data_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
 os.makedirs(str(profile_root), exist_ok=True)
+prune_profiles()
 calibration_file_path = profile_root/"calibration.pickle"
 
 def get_correction_data():
