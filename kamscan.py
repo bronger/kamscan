@@ -27,14 +27,14 @@ parser.add_argument("--width", type=float, help="width of to-be-scanned area in 
 parser.add_argument("--profile", default="default", help="name of profile to use")
 parser.add_argument("--debug", action="store_true", help="debug mode; in particular, don't suppress output of subprocesses")
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
-parser.add_argument("--two-side", action="store_true", help="whether two-side images should be assumed")
+parser.add_argument("--two-side", action="store_true", help="whether two-side images should be assumed; this swaps the "
+                    "meanings of --height and --width, with --width being the width of a double page")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
 args = parser.parse_args()
 
 assert "/" not in args.profile
 profile_root = data_root/args.profile
 if args.two_side:
-    assert args.height is None and args.width is None
     profile_root /= "two_side"
 
 if args.full_height is None:
@@ -261,9 +261,9 @@ def process_image(filepath, page_index, output_path):
                     swallow_stdout=False).stdout)
     density = correction_data.density(height)
     if args.height is not None:
-        height = args.height / 2.54 * density
+        height = (args.width if args.two_side else args.height) / 2.54 * density
     if args.width is not None:
-        width = args.width / 2.54 * density
+        width = (args.height if args.two_side else args.width) / 2.54 * density
     filepath_tiff = filepath.with_suffix(".tiff")
     tempfile_tiff = tempfile.with_suffix(".tiff")
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
