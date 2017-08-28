@@ -55,7 +55,7 @@ public:
         for RGB, it is 0, 1, or 2)
       \return raw integer value of the intensity of this channel at this
         position
-     */
+    */
     int get(int x, int y, int channel);
     /** Get the channel intensity at a certian coordinate.  The coordinates are
       floats and may contain fractions.  In this case, the intensity is
@@ -67,7 +67,7 @@ public:
         for RGB, it is 0, 1, or 2)
       \return raw integer value of the intensity of this channel at this
         position
-     */
+    */
     int get(float x, float y, int channel);
     /** Set the channel intensity at a certian coordinate.
       \param x x coordinate
@@ -76,7 +76,7 @@ public:
         for RGB, it is 0, 1, or 2)
       \param value raw integer value of the intensity of this channel at this
         position
-     */
+    */
     void set(int x, int y, int channel, int value);
     int width, height; ///< width and height of the image in pixels
     int channels; ///< number of channels; may be 1 (greyscale) or 3 (RGB)
