@@ -65,7 +65,10 @@ def silent():
     return open(os.devnull, "w") if not args.debug else None
 
 def silent_call(arguments, asynchronous=False, swallow_stdout=True):
-    kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True}
+    environment = os.environ.copy()
+    environment["OMP_THREAD_LIMIT"] = "1"
+    kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True,
+              "env": environment}
     arguments = list(map(str, arguments))
     if asynchronous:
         return subprocess.Popen(arguments, **kwargs)
