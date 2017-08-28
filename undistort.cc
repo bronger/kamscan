@@ -1,3 +1,37 @@
+/**
+   \file undistort.cc
+
+   Apply Lensfun corrections to a PNM file in place.  This means, the original
+   file is overwritten.  The command line parameters are:
+   - path to the PNM file
+   - x coordinate of top left corner
+   - y coordinate of top left corner
+   - x coordinate of top right corner
+   - y coordinate of top right corner
+   - x coordinate of bottom left corner
+   - y coordinate of bottom left corner
+   - x coordinate of bottom right corner
+   - y coordinate of bottom right corner
+
+   All coordinates are pixel coordinates, with the top left of the image the
+   origin.  The corners must be the corners of a perfect rectangle which was
+   taken a picture of, e.g. a sheet of paper.  These are used for the
+   perspective correction as well as the rotation, so that the edges of the
+   rectangle are parellel to the image borders.
+
+   The program returns the position and the dimensions of the rectangle <b>in
+   the output image</b> to stdout in JSON format:
+
+   \code{.json}
+   [x₀, y₀, width, height]
+   \endcode
+
+   Here, x₀ and y₀ are the coordinates of the top left corner, and width and
+   height are the dimensions of the rectangle.
+
+   This program does not apply colour corrections such as vignetting
+   correction, as those are handled by kamscan.py using flat field images.
+*/
 #include <fstream>
 #include <vector>
 #include <iterator>
@@ -7,19 +41,51 @@
 #include <cmath>
 #include "lensfun.h"
 
+/** Class for bitmap data.
+
+  In case of 2 bytes per channel, network byte order is assumed. */
 class Image {
 public:
-    int width, height;
-    int channel_size;
-    int channels;
-    int components;
-    lfPixelFormat pixel_format;
+    int width, height; ///< width and height of the image in pixels
+    int channel_size; ///< width of one channel in bytes; may be 1 or 2
+    int channels; ///< number of channels; may be 1 (greyscale) or 3 (RGB)
+    int components; ///< channel description; used by Lensfun internally
+    lfPixelFormat pixel_format; ///< channel_size à la Lensfun
+    /** the raw data (1:1 dump of the PNM content, without header)
+     */
     std::vector<unsigned char> data;
 
     Image(int width, int height, lfPixelFormat pixel_format, int channels);
     Image() {};
+    /** Get the channel intensity at a certian coordinate.
+      \param x x coordinate
+      \param y y coordinate
+      \param channel index of the channel (for greyscale, it is always zero;
+        for RGB, it is 0, 1, or 2)
+      \return raw integer value of the intensity of this channel at this
+        position
+     */
     int get(int x, int y, int channel);
+    /** Get the channel intensity at a certian coordinate.  The coordinates are
+      floats and may contain fractions.  In this case, the intensity is
+      calculated using bilinear interpolation between the four pixels around
+      this coordinate.
+      \param x x coordinate
+      \param y y coordinate
+      \param channel index of the channel (for greyscale, it is always zero;
+        for RGB, it is 0, 1, or 2)
+      \return raw integer value of the intensity of this channel at this
+        position
+     */
     int get(float x, float y, int channel);
+    /** Set the channel intensity at a certian coordinate.
+      \param x x coordinate
+      \param y y coordinate
+      \param channel index of the channel (for greyscale, it is always zero;
+        for RGB, it is 0, 1, or 2)
+      \param value raw integer value of the intensity of this channel at this
+        position
+     */
     void set(int x, int y, int channel, int value);
 };
 
