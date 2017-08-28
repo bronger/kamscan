@@ -297,8 +297,8 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
-    """Takes two calibration images from the camera and creates a profile from
-    them.  Such a profile consists of three files:
+    """Takes one or two calibration images from the camera and creates a profile
+    from them.  Such a profile consists of three files:
 
     - pickle file with the correction data
     - PPM file with the colour flat field
@@ -308,27 +308,36 @@ def analyze_calibration_image():
     For getting the pixel coordinates of the corners of the calibration
     rectangle, the external helper ``analyze_scan.py`` is called.
 
+    If two images are provided, the first one is a flat field, and the second
+    one is used for getting the corners of the calibration rectangle.  If one
+    image is provided, is serves both, i.e. is must be an empty white sheet of
+    paper.
+
     :returns: correction data for this scan
     :rtype: CorrectionData
 
     :raises Exception: if more than two calibration images were found on the
-      camera storage
-    :raises AssertionError: if less than two calibration images were found on
-      the camera storage
+      camera storage, or none
     """
+    def get_points(path):
+        ppm_path = call_dcraw(path, extra_raw=False)
+        raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
+        return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
+        index = None
         for index, path in camera.images(tempdir):
             if index == 0:
                 path_color, dcraw_color = call_dcraw(path, extra_raw=True, asynchronous=True)
                 path_gray, dcraw_gray = call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
             elif index == -1:
-                ppm_path = call_dcraw(path, extra_raw=False)
-                raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
-                points = [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
+                points = get_points(path)
             else:
                 raise Exception("More than two calibration images found.")
-        assert index == -1
+        if index is None:
+                raise Exception("No calibration image found.")
+        elif index == 0:
+            points = get_points(path)
         assert dcraw_color.wait() == 0
         assert dcraw_gray.wait() == 0
         shutil.move(str(path_color), str(profile_root/"flatfield.ppm"))
@@ -371,7 +380,7 @@ def get_correction_data():
     :returns: correction data for the current profile
     :rtype: CorrectionData
     """
-    print("Calibration is necessary.  First the flat field, then for the position …")
+    print("Calibration is necessary.  First the flat field, then for the position, or one image for both …")
     correction_data = analyze_calibration_image()
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
