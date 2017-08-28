@@ -88,7 +88,9 @@ class Camera:
             self.paths = self._collect_paths()
 
     def path_exists(self):
-        while True:
+        cycles_left = 5
+        while cycles_left:
+            cycles_left -= 1
             try:
                 return self.path.exists()
             except PermissionError as error:
