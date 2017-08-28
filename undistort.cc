@@ -78,9 +78,14 @@ public:
         position
     */
     void set(int x, int y, int channel, int value);
+    /** Determine the channel descriptions.  This is used by Lensfun internally
+      and necessary if you want to apply colour corrections, e.g. vignetting
+      correction.
+      \return the components of each pixel
+    */
+    int components();
     int width, height; ///< width and height of the image in pixels
     int channels; ///< number of channels; may be 1 (greyscale) or 3 (RGB)
-    int components; ///< channel description; used by Lensfun internally
     lfPixelFormat pixel_format; ///< channel_size à la Lensfun
     /** the raw data (1:1 dump of the PNM content, without header)
      */
@@ -104,16 +109,6 @@ Image::Image(int width, int height, lfPixelFormat pixel_format, int channels) :
         break;
     default:
         throw std::runtime_error("Invalid pixel format");
-    }
-    switch (channels) {
-    case 1:
-        components = LF_CR_1(INTENSITY);
-        break;
-    case 3:
-        components = LF_CR_3(RED, GREEN, BLUE);
-        break;
-    default:
-        throw std::runtime_error("Invalid number of color channels");
     }
     data.resize(width * height * channel_size * channels);
 }
@@ -155,18 +150,26 @@ void Image::set(int x, int y, int channel, int value) {
     }
 }
 
+int Image::components() {
+    switch (channels) {
+    case 1:
+        return LF_CR_1(INTENSITY);
+    case 3:
+        return LF_CR_3(RED, GREEN, BLUE);
+    default:
+        throw std::runtime_error("Invalid value of 'channels'.");
+    }
+}
+
 std::istream& operator >>(std::istream &inputStream, Image &other)
 {
     std::string magic_number;
     int maximum_color_value;
     inputStream >> magic_number;
-    if (magic_number == "P5") {
+    if (magic_number == "P5")
         other.channels = 1;
-        other.components = LF_CR_1(INTENSITY);
-    } else if (magic_number == "P6") {
+    else if (magic_number == "P6")
         other.channels = 3;
-        other.components = LF_CR_3(RED, GREEN, BLUE);
-    }
     else
         throw std::runtime_error("Invalid input file.  Must start with 'P5' or 'P6'.");
     inputStream >> other.width >> other.height >> maximum_color_value;
