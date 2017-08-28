@@ -280,9 +280,9 @@ def process_image(filepath, output_path):
     if args.two_side:
         filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
         filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
-        left = silent_call(["convert", "-extract", filepath_tiff, "{0}x{1}+0+0".format(width, height / 2), "-rotate", "-90",
+        left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff, "-rotate", "-90",
                             filepath_left_tiff], asynchronous=True)
-        silent_call(["convert", "-extract", filepath_tiff, "{0}x{1}+0+{1}".format(width, height / 2), "-rotate", "-90",
+        silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff, "-rotate", "-90",
                      filepath_right_tiff])
         assert left.wait() == 0
         shutil.copy(str(filepath_left_tiff), "/tmp")
