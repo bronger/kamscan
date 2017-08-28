@@ -97,8 +97,8 @@ public:
     std::vector<unsigned char> data;
 
 private:
-    friend std::istream& operator >>(std::istream &inputStream, Image &other);
-    friend std::ostream& operator <<(std::ostream &outputStream, const Image &other);
+    friend std::istream& operator>>(std::istream &inputStream, Image &other);
+    friend std::ostream& operator<<(std::ostream &outputStream, const Image &other);
     int channel_size; ///< width of one channel in bytes; may be 1 or 2
 };
 
@@ -171,7 +171,7 @@ lfPixelFormat Image::pixel_format() {
     }
 }
 
-std::istream& operator >>(std::istream &inputStream, Image &other)
+std::istream& operator>>(std::istream &inputStream, Image &other)
 {
     std::string magic_number;
     int maximum_color_value;
@@ -200,7 +200,7 @@ std::istream& operator >>(std::istream &inputStream, Image &other)
     return inputStream;
 }
 
-std::ostream& operator <<(std::ostream &outputStream, const Image &other)
+std::ostream& operator<<(std::ostream &outputStream, const Image &other)
 {
     outputStream << (other.channels == 3 ? "P6" : "P5") << "\n"
                  << other.width << " "
