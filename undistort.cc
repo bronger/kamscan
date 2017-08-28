@@ -46,8 +46,9 @@
   In case of 2 bytes per channel, network byte order is assumed. */
 class Image {
 public:
-    Image(int width, int height, lfPixelFormat pixel_format, int channels);
+    Image(int width, int height, int channel_size, int channels);
     Image() {};
+    Image(const Image &image);
     /** Get the channel intensity at a certian coordinate.
       \param x x coordinate
       \param y y coordinate
@@ -84,9 +85,13 @@ public:
       \return the components of each pixel
     */
     int components();
+    /** Determine the pixel format à la Lensfun.  It is derived from
+      channel_size.
+      \return the pixel format as it is needed by Lensfun
+     */
+    lfPixelFormat pixel_format();
     int width, height; ///< width and height of the image in pixels
     int channels; ///< number of channels; may be 1 (greyscale) or 3 (RGB)
-    lfPixelFormat pixel_format; ///< channel_size à la Lensfun
     /** the raw data (1:1 dump of the PNM content, without header)
      */
     std::vector<unsigned char> data;
@@ -97,20 +102,14 @@ private:
     int channel_size; ///< width of one channel in bytes; may be 1 or 2
 };
 
-Image::Image(int width, int height, lfPixelFormat pixel_format, int channels) :
-    width(width), height(height), pixel_format(pixel_format), channels(channels)
+Image::Image(int width, int height, int channel_size, int channels) :
+    width(width), height(height), channel_size(channel_size), channels(channels)
 {
-    switch (pixel_format) {
-    case LF_PF_U8:
-        channel_size = 1;
-        break;
-    case LF_PF_U16:
-        channel_size = 2;
-        break;
-    default:
-        throw std::runtime_error("Invalid pixel format");
-    }
     data.resize(width * height * channel_size * channels);
+}
+
+Image::Image(const Image &image) :
+    width(image.width), height(image.height), channel_size(image.channel_size), channels(image.channels) {
 }
 
 int Image::get(int x, int y, int channel) {
@@ -161,6 +160,17 @@ int Image::components() {
     }
 }
 
+lfPixelFormat Image::pixel_format() {
+    switch (channel_size) {
+    case 1:
+        return LF_PF_U8;
+    case 2:
+        return LF_PF_U16;
+    default:
+        throw std::runtime_error("Invalid value of 'channel_size'.");
+    }
+}
+
 std::istream& operator >>(std::istream &inputStream, Image &other)
 {
     std::string magic_number;
@@ -176,11 +186,9 @@ std::istream& operator >>(std::istream &inputStream, Image &other)
     inputStream.get(); // skip the trailing white space
     switch (maximum_color_value) {
     case 255:
-        other.pixel_format = LF_PF_U8;
         other.channel_size = 1;
         break;
     case 65535:
-        other.pixel_format = LF_PF_U16;
         other.channel_size = 2;
         break;
     default:
@@ -197,7 +205,7 @@ std::ostream& operator <<(std::ostream &outputStream, const Image &other)
     outputStream << (other.channels == 3 ? "P6" : "P5") << "\n"
                  << other.width << " "
                  << other.height << "\n"
-                 << (other.pixel_format == LF_PF_U8 ? "255" : "65535") << "\n";
+                 << (other.channel_size == 1 ? "255" : "65535") << "\n";
     outputStream.write(reinterpret_cast<const char*>(other.data.data()), other.data.size());
     return outputStream;
 }
@@ -245,9 +253,9 @@ int main(int argc, char* argv[]) {
         file >> image;
     }
 
-    lfModifier modifier(camera->CropFactor, image.width, image.height, image.pixel_format);
-    lfModifier pc_coord_modifier(camera->CropFactor, image.width, image.height, image.pixel_format, true);
-    lfModifier back_modifier(camera->CropFactor, image.width, image.height, image.pixel_format, true);
+    lfModifier modifier(camera->CropFactor, image.width, image.height, image.pixel_format());
+    lfModifier pc_coord_modifier(camera->CropFactor, image.width, image.height, image.pixel_format(), true);
+    lfModifier back_modifier(camera->CropFactor, image.width, image.height, image.pixel_format(), true);
     if (!modifier.EnableDistortionCorrection(lens, 50) || !back_modifier.EnableDistortionCorrection(lens, 50) ||
         !pc_coord_modifier.EnableDistortionCorrection(lens, 50)) {
         std::cerr << "Failed to activate undistortion\n";
@@ -294,7 +302,7 @@ int main(int argc, char* argv[]) {
         modifier.ApplySubpixelGeometryDistortion(0, 0, image.width, image.height, res.data());
     else
         modifier.ApplyGeometryDistortion(0, 0, image.width, image.height, res.data());
-    Image new_image(image.width, image.height, image.pixel_format, image.channels);
+    Image new_image = image;
     for (int x = 0; x < image.width; x++)
         for (int y = 0; y < image.height; y++) {
             int position = 2 * image.channels * (y * image.width + x);
