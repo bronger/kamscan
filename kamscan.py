@@ -129,20 +129,22 @@ class Camera:
                                      swallow_stdout=False).stdout.strip()
                 paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
             paths_with_timestamps.sort()
-            path_tripletts = set()
-            i = 0
+            path_tuples = set()
+            page_index = 0
             for __, path in paths_with_timestamps:
-                path_tripletts.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(i)))
-                i += 1
-            rsync = silent_call(["rsync"] + [path[0] for path in path_tripletts] + [tempdir], asynchronous=True)
-            while path_tripletts:
-                for triplett in path_tripletts:
-                    old_path, intermediate_path, destination = triplett
+                path_tuples.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(page_index), page_index))
+                page_index += 1
+            rsync = silent_call(["rsync"] + [path[0] for path in path_tuples] + [tempdir], asynchronous=True)
+            while path_tuples:
+                for path_tuple in path_tuples:
+                    old_path, intermediate_path, destination, page_index = path_tuple
                     if intermediate_path.exists():
                         os.rename(str(intermediate_path), str(destination))
                         os.remove(str(old_path))
-                        path_tripletts.remove(triplett)
-                        yield destination
+                        path_tuples.remove(path_tuple)
+                        if not path_tuples and page_index != 0:
+                            page_index = -1
+                        yield page_index, destination
                         break
             assert rsync.wait() == 0
 
@@ -192,17 +194,17 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
 def analyze_calibration_image():
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
-        for index, path in enumerate(camera.images(tempdir)):
+        for index, path in camera.images(tempdir):
             if index == 0:
                 path_color, dcraw_color = call_dcraw(path, extra_raw=True, asynchronous=True)
                 path_gray, dcraw_gray = call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
-            elif index == 1:
+            elif index == -1:
                 ppm_path = call_dcraw(path, extra_raw=False)
                 raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
                 points = [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
             else:
                 raise Exception("More than one calibration image found.")
-        assert index == 1
+        assert index == -1
         assert dcraw_color.wait() == 0
         assert dcraw_gray.wait() == 0
         shutil.move(str(path_color), str(profile_root/"flatfield.ppm"))
@@ -248,7 +250,7 @@ else:
         correction_data = get_correction_data()
 
 
-def process_image(filepath, output_path):
+def process_image(filepath, page_index, output_path):
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
@@ -281,17 +283,21 @@ def process_image(filepath, output_path):
     silent_call(convert_call)
     tiff_filepaths = set()
     if args.two_side:
-        filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
-        filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
-        left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff, "-rotate", "-90",
-                            filepath_left_tiff], asynchronous=True)
-        silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff, "-rotate", "-90",
-                     filepath_right_tiff])
-        assert left.wait() == 0
-        shutil.copy(str(filepath_left_tiff), "/tmp")
-        shutil.copy(str(filepath_right_tiff), "/tmp")
-        tiff_filepaths.add(filepath_left_tiff)
-        tiff_filepaths.add(filepath_right_tiff)
+        if page_index != 0:
+            filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
+            left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff,
+                                "-rotate", "-90", filepath_left_tiff], asynchronous=True)
+        if page_index != -1:
+            filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
+            silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff,
+                         "-rotate", "-90", filepath_right_tiff])
+        if page_index != 0:
+            assert left.wait() == 0
+            shutil.copy(str(filepath_left_tiff), "/tmp")
+            tiff_filepaths.add(filepath_left_tiff)
+        if page_index != -1:
+            shutil.copy(str(filepath_right_tiff), "/tmp")
+            tiff_filepaths.add(filepath_right_tiff)
     else:
         tiff_filepaths = {filepath_tiff}
     result = set()
@@ -309,8 +315,8 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    for path in camera.images(tempdir, wait_for_disconnect=False):
-        results.add(pool.apply_async(process_image, (path, tempdir)))
+    for index, path in camera.images(tempdir, wait_for_disconnect=False):
+        results.add(pool.apply_async(process_image, (path, index, tempdir)))
     print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
     pool.close()
     pool.join()
