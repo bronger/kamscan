@@ -31,6 +31,11 @@
 
    This program does not apply colour corrections such as vignetting
    correction, as those are handled by kamscan.py using flat field images.
+
+   \b Important: This program has my lens hardcoded into it, the 50mm f/1.8 OSS
+   for the Sony E mount.  It was necessary to make a special calibration for
+   the finite distance to the subject.  Lensfun contains corrections for focus
+   at infinity.
 */
 #include <fstream>
 #include <vector>
