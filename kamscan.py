@@ -59,10 +59,32 @@ def silent():
     as in::
 
         subprocess.check_call([...], stderr=silent())
+
+    It obeys the ``--debug`` option, i.e. if ``--debug`` is set, no redirection
+    takes place.
     """
     return open(os.devnull, "w") if not args.debug else None
 
 def silent_call(arguments, asynchronous=False, swallow_stdout=True):
+    """Calls an external program.  stdout and stderr are swallowed by default.  The
+    environment variable ``OMP_THREAD_LIMIT`` is set to one, because we do
+    parallelism by ourselves.  In particular, Tesseract scales *very* badly (at
+    least, version 4.0) with more threads.
+
+    :param list[object] arguments: the arguments for the call.  They are
+      converted to ``str`` implicitly.
+    :param bool asynchronous: whether the program should be launched
+      asynchronously
+    :param bool swallow_stdout: if ``False``, stdout is caught and can be
+      inspected by the caller (as a str rather than a byte string)
+
+    :returns: if asynchronous, it returns a ``Popen`` object, otherwise, it
+      returns a ``CompletedProcess`` object.
+    :rtype: subprocess.Popen or subprocess.CompletedProcess
+
+    :raises subprocess.CalledProcessError: if a synchronously called process
+      returns a non-zero return code
+    """
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
     kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True,
@@ -88,6 +110,11 @@ class Camera:
             self.paths = self._collect_paths()
 
     def path_exists(self):
+        """Returns whether the mount point of the camera exists.
+
+        :returns: whether the mount point of the camera exists
+        :rtype: bool
+        """
         cycles_left = 5
         while cycles_left:
             cycles_left -= 1
@@ -98,6 +125,11 @@ class Camera:
 
     @contextmanager
     def _camera_connected(self, wait_for_disconnect=True):
+        """Context manager for a mounted camera storage.
+
+        :param bool wait_for_disconnect: whether to explicitly wait for the
+          camera baing unplugged
+        """
         if not self.path_exists():
             print("Please plug-in camera.")
         while not self.path_exists():
@@ -109,6 +141,11 @@ class Camera:
                 time.sleep(1)
 
     def _collect_paths(self):
+        """Returns all paths on the camera storage that refer to images.
+
+        :returns: all image paths on the camera storage
+        :rtype: set[pathlib.Path]
+        """
         result = set()
         for root, __, filenames in os.walk(str(self.path)):
             for filename in filenames:
@@ -118,6 +155,23 @@ class Camera:
         return result
 
     def images(self, tempdir, wait_for_disconnect=True):
+        """Returns in iterator over the new images on the camera storage.  “New” means
+        here that they were added after the last call to this generator, or
+        after the instatiation of this `Camera` object.
+
+        The newly found image files are removed from the camera storage.
+
+        :param pathlib.Path tempdir: temporary directoy, managed by the caller,
+          where the raw images are stored
+        :param bool wait_for_disconnect: whether to explicitly wait for the
+          camera baing unplugged
+
+        :returns: iterator over the image files; each item is a tuple which
+          consists of the page index (starting at zero) and the path to the
+          image file; note that the last image is marked by having a page index
+          of -1.
+        :rtype: iterator[tuple[int, pathlib.Path]]
+        """
         print("Please take pictures.  Then:")
         with self._camera_connected(wait_for_disconnect):
             paths = self._collect_paths()
@@ -151,6 +205,24 @@ camera = Camera()
 
 
 def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
+    """Calls dcraw to convert a raw image to a PNM file.  In case of `gray` being
+    ``False``, it is a PPM file, otherwise, it is a PGM file.  If `extra_raw`
+    is ``False``, the colour depth is 8 bit, and various colour space
+    transformations of dcraw are applied in order to make the result look nice.
+
+    :param pathlib.Path path: path to the raw image file
+    :param bool extra_raw: whether the result is as raw as possible, i.e. 16
+      bit, linear, no colour space transformation
+    :param bool gray: wether to produce a greyscale file; if ``False``,
+      demosaicing is applied
+    :param float b: exposure correction; all intensities are multiplied by this
+      value
+    :param bool asynchronous: whether to call dcraw asynchronously
+
+    :returns: output path of the PNM file; if dcraw was called asynchronously,
+      the dcraw ``Popen`` object is returned, too
+    :rtype: pathlib.Path or tuple[pathlib.Path, subprocess.Popen]
+    """
     dcraw_call = ["dcraw", "-t", 5]
     if extra_raw:
         dcraw_call.extend(["-o", 0, "-M", "-6", "-g", 1, 1, "-r", 1, 1, 1, 1, "-W"])
@@ -169,19 +241,54 @@ def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
 
 
 class CorrectionData:
+    """Class holding data that belongs to an image calibration.  This data is part
+    of a profile.  It is stored in the pickle file in the profile's directory.
+
+    :var coordinates: The pixel coordinates of the rectangle measured during
+      the calibration.  Note that this rectangle needn't necessarily be the
+      enclosing area of all scans.  This is just the default.  In fact, the
+      ``--width`` and ``--height`` parameters denote the actual scan size, and
+      they can be even larger than the rectangle.  The four corners are stored
+      in the order top left, top right, bottom left, bottom right.  First the x
+      coordinate, then the y coordinate.
+    :vartype coodinates: list[int]
+
+    :var float height_in_cm: the real-world height (i.e., dimension in y
+      direction) of the rectangle given by `coordinates` in centimetres.
+    """
 
     def __init__(self):
         self.coordinates = 8 * [None]
         self.height_in_cm = page_height
 
     def density(self, height_in_pixel):
+        """Returns the DPI (dots per inch) of the scan.
+
+        :param int height_in_pixel: height of the scan area (i.e., dimension in
+          y direction) in pixels
+
+        :returns: dpi of the scan
+        :rtype: float
+        """
         return height_in_pixel / (self.height_in_cm / 2.54)
 
     def __repr__(self):
+        """Returns a string representation of this object.  This is used only for
+        debugging purposes.
+
+        :returns: string representation of this object
+        :rtype: str
+        """
         return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coordinates)
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
+    """Lets the user find the four corners of the calibration rectangle.
+
+    :returns: Pixel coordinates of the four corners of the calibration
+      rectangle.  They are returned in no particular order.
+    :rtype: list[tuple[int, int]]
+    """
     def clamp(x, max_):
         return min(max(x, 0), max_ - 1)
     output = silent_call([path_to_own_program("analyze_scan.py"), clamp(x, 4000), clamp(y, 6000), scaling,
@@ -190,6 +297,25 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     return result
 
 def analyze_calibration_image():
+    """Takes two calibration images from the camera and creates a profile from
+    them.  Such a profile consists of three files:
+
+    - pickle file with the correction data
+    - PPM file with the colour flat field
+    - PGM file with the greyscale flat field (also used for the monochromatic
+      mode)
+
+    For getting the pixel coordinates of the corners of the calibration
+    rectangle, the external helper ``analyze_scan.py`` is called.
+
+    :returns: correction data for this scan
+    :rtype: CorrectionData
+
+    :raises Exception: if more than two calibration images were found on the
+      camera storage
+    :raises AssertionError: if less than two calibration images were found on
+      the camera storage
+    """
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
         for index, path in camera.images(tempdir):
@@ -225,6 +351,9 @@ def analyze_calibration_image():
 
 
 def prune_profiles():
+    """Removes profiles that are older than 5 o'clock of today, and at least 4
+    hours old.
+    """
     now = datetime.datetime.now()
     minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
     minutes = max(minutes, 4 * 60)
@@ -234,6 +363,14 @@ prune_profiles()
 calibration_file_path = profile_root/"calibration.pickle"
 
 def get_correction_data():
+    """Returns the correction data for the current profile.  If such data does not
+    yet exist on disk, the user gets the opportunity to provide the necessary
+    input for it (taking calibration images, click on corners).  The result of
+    this is stored on disk.
+
+    :returns: correction data for the current profile
+    :rtype: CorrectionData
+    """
     print("Calibration is necessary.  First the flat field, then for the position …")
     correction_data = analyze_calibration_image()
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
@@ -249,6 +386,18 @@ else:
 
 
 def process_image(filepath, page_index, output_path):
+    """Converts one raw image to a searchable single-page PDF.
+
+    :param pathlib.Path filepath: path to the raw image file
+    :param int page_index: Index of the current page.  In two-side mode, this
+      is the index of the current double page because separation of left and
+      right happens in this function.  Moreover, the last page has the index
+      -1.
+    :param pathlib.Path output_path: directory where the PDFs are written to
+
+    :returns: path to the PDF, or the two PDFs in two-side mode
+    :rtype: set[pathlib.Path]
+    """
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
