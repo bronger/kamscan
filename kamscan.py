@@ -201,7 +201,7 @@ def analyze_calibration_image():
                 raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
                 points = [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
             else:
-                raise Exception("More than one calibration image found.")
+                raise Exception("More than two calibration images found.")
         assert index == -1
         assert dcraw_color.wait() == 0
         assert dcraw_gray.wait() == 0
