@@ -34,8 +34,6 @@ args = parser.parse_args()
 
 assert "/" not in args.profile
 profile_root = data_root/args.profile
-if args.two_side:
-    profile_root /= "two_side"
 
 if args.full_height is None:
     page_height = 29.7
