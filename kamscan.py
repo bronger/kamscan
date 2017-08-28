@@ -92,7 +92,6 @@ class Camera:
             try:
                 return self.path.exists()
             except PermissionError as error:
-                print(error)
                 time.sleep(1)
 
     @contextmanager
