@@ -279,7 +279,7 @@ def process_image(filepath, page_index, output_path):
     elif args.mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
     elif args.mode == "mono":
-        convert_call.extend(["-level", "0,75%,1.2", "-set", "colorspace", "gray",
+        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,80%",
                              "-dither", "FloydSteinberg", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", density, filepath_tiff])
     silent_call(convert_call)
