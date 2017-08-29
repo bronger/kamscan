@@ -115,6 +115,7 @@ Image::Image(int width, int height, int channel_size, int channels) :
 
 Image::Image(const Image &image) :
     width(image.width), height(image.height), channel_size(image.channel_size), channels(image.channels) {
+    data.resize(width * height * channel_size * channels);
 }
 
 int Image::get(int x, int y, int channel) {
