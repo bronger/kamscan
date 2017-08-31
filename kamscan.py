@@ -422,7 +422,7 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
     filepath_tiff = filepath.with_suffix(".tiff")
     if suffix:
         filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
-    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
+    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
     tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
     if mode == "color":
         silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
@@ -446,11 +446,11 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
 def split_two_side(page_index, filepath_tiff, width, height):
     if page_index != 0:
         filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
-        left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff,
+        left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
                             "-rotate", "-90", filepath_left_tiff], asynchronous=True)
     if page_index != -1:
         filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
-        silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff,
+        silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), "+repage", filepath_tiff,
                      "-rotate", "-90", filepath_right_tiff])
     tiff_filepaths = []
     if page_index != 0:
