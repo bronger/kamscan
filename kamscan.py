@@ -418,8 +418,10 @@ def calculate_pixel_dimensions(width, height):
     return width, height, density
 
 
-def create_single_tiff(filepath, width, height, x0, y0, density, mode):
+def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=None):
     filepath_tiff = filepath.with_suffix(".tiff")
+    if suffix:
+        filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
     tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
     if mode == "color":
