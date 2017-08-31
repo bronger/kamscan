@@ -452,12 +452,12 @@ def split_two_side(page_index, filepath_tiff, width, height):
         filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
         silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff,
                      "-rotate", "-90", filepath_right_tiff])
-    tiff_filepaths = set()
+    tiff_filepaths = []
     if page_index != 0:
         assert left.wait() == 0
-        tiff_filepaths.add(filepath_left_tiff)
+        tiff_filepaths.append(filepath_left_tiff)
     if page_index != -1:
-        tiff_filepaths.add(filepath_right_tiff)
+        tiff_filepaths.append(filepath_right_tiff)
     return tiff_filepaths
 
 
@@ -480,7 +480,7 @@ def process_image(filepath, page_index, output_path):
     if args.two_side:
         tiff_filepaths = split_two_side(page_index, filepath_tiff, width, height)
     else:
-        tiff_filepaths = {filepath_tiff}
+        tiff_filepaths = [filepath_tiff]
     result = set()
     processes = set()
     for path in tiff_filepaths:
