@@ -427,6 +427,8 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode):
         convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
     elif mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
+    elif mode == "gray_linear":
+        convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
     elif mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,75%",
                              "-dither", "None", "-monochrome", "-depth", "1", "-compress", "group4"])
