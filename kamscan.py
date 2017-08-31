@@ -394,6 +394,24 @@ else:
         correction_data = get_correction_data()
 
 
+def split_two_side(page_index, filepath_tiff, width, height):
+    if page_index != 0:
+        filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
+        left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff,
+                            "-rotate", "-90", filepath_left_tiff], asynchronous=True)
+    if page_index != -1:
+        filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
+        silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff,
+                     "-rotate", "-90", filepath_right_tiff])
+    tiff_filepaths = set()
+    if page_index != 0:
+        assert left.wait() == 0
+        tiff_filepaths.add(filepath_left_tiff)
+    if page_index != -1:
+        tiff_filepaths.add(filepath_right_tiff)
+    return tiff_filepaths
+
+
 def process_image(filepath, page_index, output_path):
     """Converts one raw image to a searchable single-page PDF.
 
@@ -436,21 +454,8 @@ def process_image(filepath, page_index, output_path):
                              "-dither", "None", "-monochrome", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", density, filepath_tiff])
     silent_call(convert_call)
-    tiff_filepaths = set()
     if args.two_side:
-        if page_index != 0:
-            filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
-            left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff,
-                                "-rotate", "-90", filepath_left_tiff], asynchronous=True)
-        if page_index != -1:
-            filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
-            silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff,
-                         "-rotate", "-90", filepath_right_tiff])
-        if page_index != 0:
-            assert left.wait() == 0
-            tiff_filepaths.add(filepath_left_tiff)
-        if page_index != -1:
-            tiff_filepaths.add(filepath_right_tiff)
+        tiff_filepaths = split_two_side(page_index, filepath_tiff, width, height)
     else:
         tiff_filepaths = {filepath_tiff}
     result = set()
