@@ -477,20 +477,28 @@ def process_image(filepath, page_index, output_path):
     filepath, x0, y0, width, height = raw_to_corrected_pnm(filepath)
     width, height, density = calculate_pixel_dimensions(width, height)
     filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density, args.mode)
+    filepath_ocr_tiff = create_single_tiff(filepath, width, height, x0, y0, density, "gray_linear", "-ocr")
     if args.two_side:
         tiff_filepaths = split_two_side(page_index, filepath_tiff, width, height)
+        ocr_tiff_filepaths = split_two_side(page_index, filepath_ocr_tiff, width, height)
     else:
         tiff_filepaths = [filepath_tiff]
-    result = set()
+        ocr_tiff_filepaths = [filepath_ocr_tiff]
     processes = set()
-    for path in tiff_filepaths:
+    for path, ocr_path in zip(tiff_filepaths, ocr_tiff_filepaths):
         pdf_filepath = output_path/path.with_suffix(".pdf").name
-        tesseract = silent_call(["tesseract", path, pdf_filepath.parent/pdf_filepath.stem, "-l", args.language, "pdf"],
-                                asynchronous=True)
-        processes.add(tesseract)
-        result.add(pdf_filepath)
-    for tesseract in processes:
+        textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
+        textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
+        tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1", "-l", args.language,
+                                 "pdf"], asynchronous=True)
+        pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
+        silent_call(["convert", path, pdf_image_path])
+        processes.add((tesseract, textonly_pdf_filepath, pdf_image_path, pdf_filepath))
+    result = set()
+    for tesseract, textonly_pdf_filepath, pdf_image_path, pdf_filepath in processes:
         assert tesseract.wait() == 0
+        silent_call(["pdftk", textonly_pdf_filepath, "multibackground", pdf_image_path, "output", pdf_filepath])
+        result.add(pdf_filepath)
     return result
 
 
