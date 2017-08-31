@@ -394,6 +394,47 @@ else:
         correction_data = get_correction_data()
 
 
+def raw_to_corrected_pnm(filepath):
+    filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
+    flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
+    tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
+    silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
+    os.rename(str(tempfile), str(filepath))
+    x0, y0, width, height = json.loads(
+        silent_call([path_to_own_program("undistort"), filepath] + correction_data.coordinates, swallow_stdout=False).stdout)
+    return filepath, x0, y0, width, height
+
+
+def calculate_pixel_dimensions(width, height):
+    density = correction_data.density(height)
+    if args.height is not None:
+        height = (args.width if args.two_side else args.height) / 2.54 * density
+    if args.width is not None:
+        width = (args.height if args.two_side else args.width) / 2.54 * density
+    return width, height, density
+
+
+def create_single_tiff(filepath, width, height, x0, y0, density):
+    filepath_tiff = filepath.with_suffix(".tiff")
+    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
+    tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
+    if args.mode == "color":
+        silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
+    else:
+        os.rename(str(filepath_tiff), str(tempfile_tiff))
+    convert_call = ["convert", tempfile_tiff, "-linear-stretch", "2%x1%"]
+    if args.mode == "color":
+        convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
+    elif args.mode == "gray":
+        convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
+    elif args.mode == "mono":
+        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,75%",
+                             "-dither", "None", "-monochrome", "-depth", "1", "-compress", "group4"])
+    convert_call.extend(["-density", density, filepath_tiff])
+    silent_call(convert_call)
+    return filepath_tiff
+
+
 def split_two_side(page_index, filepath_tiff, width, height):
     if page_index != 0:
         filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
@@ -425,35 +466,9 @@ def process_image(filepath, page_index, output_path):
     :returns: path to the PDF, or the two PDFs in two-side mode
     :rtype: set[pathlib.Path]
     """
-    filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
-    flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
-    tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
-    silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
-    os.rename(str(tempfile), str(filepath))
-    x0, y0, width, height = json.loads(
-        silent_call([path_to_own_program("undistort"), filepath] + correction_data.coordinates, swallow_stdout=False).stdout)
-    density = correction_data.density(height)
-    if args.height is not None:
-        height = (args.width if args.two_side else args.height) / 2.54 * density
-    if args.width is not None:
-        width = (args.height if args.two_side else args.width) / 2.54 * density
-    filepath_tiff = filepath.with_suffix(".tiff")
-    tempfile_tiff = tempfile.with_suffix(".tiff")
-    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
-    if args.mode == "color":
-        silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
-    else:
-        os.rename(str(filepath_tiff), str(tempfile_tiff))
-    convert_call = ["convert", tempfile_tiff, "-linear-stretch", "2%x1%"]
-    if args.mode == "color":
-        convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
-    elif args.mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
-    elif args.mode == "mono":
-        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,75%",
-                             "-dither", "None", "-monochrome", "-depth", "1", "-compress", "group4"])
-    convert_call.extend(["-density", density, filepath_tiff])
-    silent_call(convert_call)
+    filepath, x0, y0, width, height = raw_to_corrected_pnm(filepath)
+    width, height, density = calculate_pixel_dimensions(width, height)
+    filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density)
     if args.two_side:
         tiff_filepaths = split_two_side(page_index, filepath_tiff, width, height)
     else:
@@ -468,6 +483,7 @@ def process_image(filepath, page_index, output_path):
     for process in processes:
         assert process.wait() == 0
     return result
+
 
 with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
