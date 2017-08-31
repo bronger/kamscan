@@ -466,7 +466,9 @@ def process_image(filepath, page_index, output_path):
     for process, tiff_filepath, hocr_filepath in processes:
         assert process.wait() == 0
         pdf_filepath = hocr_filepath.with_suffix(".pdf")
-        silent_call(["hocr2pdf", "--input", tiff_filepath, "--output", pdf_filepath], input=open(str(hocr_filepath)).read())
+        hocr_data = silent_call(["xsltproc", "-html", "-nonet", "-novalid", path_to_own_program("fix-hocr.xsl"),
+                                 hocr_filepath], swallow_stdout=False).stdout
+        silent_call(["hocr2pdf", "--input", tiff_filepath, "--output", pdf_filepath, "--no-image"], input=hocr_data)
         result.add(pdf_filepath)
     return result
 
