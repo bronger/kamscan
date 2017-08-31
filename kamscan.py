@@ -485,11 +485,12 @@ def process_image(filepath, page_index, output_path):
     processes = set()
     for path in tiff_filepaths:
         pdf_filepath = output_path/path.with_suffix(".pdf").name
-        processes.add(silent_call(["tesseract", path, pdf_filepath.parent/pdf_filepath.stem, "-l", args.language, "pdf"],
-                                  asynchronous=True))
+        tesseract = silent_call(["tesseract", path, pdf_filepath.parent/pdf_filepath.stem, "-l", args.language, "pdf"],
+                                asynchronous=True)
+        processes.add(tesseract)
         result.add(pdf_filepath)
-    for process in processes:
-        assert process.wait() == 0
+    for tesseract in processes:
+        assert tesseract.wait() == 0
     return result
 
 
