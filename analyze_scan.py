@@ -3,6 +3,7 @@
 import subprocess, json, sys, os
 os.environ["KIVY_NO_FILELOG"] = "1"
 os.environ["KIVY_NO_CONSOLELOG"] = "1"
+os.environ["KIVY_NO_CONFIG"] = "1"
 from kivy.app import App
 from kivy.uix.image import Image
 
