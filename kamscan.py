@@ -414,20 +414,20 @@ def calculate_pixel_dimensions(width, height):
     return width, height, density
 
 
-def create_single_tiff(filepath, width, height, x0, y0, density):
+def create_single_tiff(filepath, width, height, x0, y0, density, mode):
     filepath_tiff = filepath.with_suffix(".tiff")
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), filepath, filepath_tiff])
     tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
-    if args.mode == "color":
+    if mode == "color":
         silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
     convert_call = ["convert", tempfile_tiff, "-linear-stretch", "2%x1%"]
-    if args.mode == "color":
+    if mode == "color":
         convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
-    elif args.mode == "gray":
+    elif mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
-    elif args.mode == "mono":
+    elif mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,75%",
                              "-dither", "None", "-monochrome", "-depth", "1", "-compress", "group4"])
     convert_call.extend(["-density", density, filepath_tiff])
@@ -468,7 +468,7 @@ def process_image(filepath, page_index, output_path):
     """
     filepath, x0, y0, width, height = raw_to_corrected_pnm(filepath)
     width, height, density = calculate_pixel_dimensions(width, height)
-    filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density)
+    filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density, args.mode)
     if args.two_side:
         tiff_filepaths = split_two_side(page_index, filepath_tiff, width, height)
     else:
