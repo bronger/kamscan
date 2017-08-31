@@ -65,7 +65,7 @@ def silent():
     """
     return open(os.devnull, "w") if not args.debug else None
 
-def silent_call(arguments, asynchronous=False, swallow_stdout=True):
+def silent_call(arguments, asynchronous=False, swallow_stdout=True, input=None):
     """Calls an external program.  stdout and stderr are swallowed by default.  The
     environment variable ``OMP_THREAD_LIMIT`` is set to one, because we do
     parallelism by ourselves.  In particular, Tesseract scales *very* badly (at
@@ -77,6 +77,8 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
       asynchronously
     :param bool swallow_stdout: if ``False``, stdout is caught and can be
       inspected by the caller (as a str rather than a byte string)
+    :param str input: content of stdin for the process; does not work for
+      asynchronous execution
 
     :returns: if asynchronous, it returns a ``Popen`` object, otherwise, it
       returns a ``CompletedProcess`` object.
@@ -85,6 +87,7 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
     :raises subprocess.CalledProcessError: if a synchronously called process
       returns a non-zero return code
     """
+    assert not (input is not None and asynchronous)
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
     kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True,
@@ -94,6 +97,7 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
         return subprocess.Popen(arguments, **kwargs)
     else:
         kwargs["check"] = True
+        kwargs["input"] = input
         return subprocess.run(arguments, **kwargs)
 
 
