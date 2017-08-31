@@ -457,15 +457,17 @@ def process_image(filepath, page_index, output_path):
             tiff_filepaths.add(filepath_right_tiff)
     else:
         tiff_filepaths = {filepath_tiff}
-    result = set()
     processes = set()
     for path in tiff_filepaths:
-        pdf_filepath = output_path/path.with_suffix(".pdf").name
-        processes.add(silent_call(["tesseract", path, pdf_filepath.parent/pdf_filepath.stem, "-l", args.language, "pdf"],
-                                  asynchronous=True))
-        result.add(pdf_filepath)
-    for process in processes:
+        hocr_filepath = output_path/path.with_suffix(".hocr").name
+        processes.add((silent_call(["tesseract", path, hocr_filepath.parent/hocr_filepath.stem, "-l", args.language, "hocr"],
+                                   asynchronous=True), path, hocr_filepath))
+    result = set()
+    for process, tiff_filepath, hocr_filepath in processes:
         assert process.wait() == 0
+        pdf_filepath = hocr_filepath.with_suffix(".pdf")
+        silent_call(["hocr2pdf", "--input", tiff_filepath, "--output", pdf_filepath], input=open(str(hocr_filepath)).read())
+        result.add(pdf_filepath)
     return result
 
 with tempfile.TemporaryDirectory() as tempdir:
