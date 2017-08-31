@@ -54,6 +54,10 @@ def path_to_own_program(name):
     return (Path(__file__).parent/name).resolve()
 
 
+def append_to_path_stem(path, suffix):
+    return (path.parent/(path.stem + suffix)).with_suffix(path.suffix)
+
+
 def silent():
     """Used in subprocess calls to redirect stdout or stderr to ``/dev/null``,
     as in::
@@ -397,7 +401,7 @@ else:
 def raw_to_corrected_pnm(filepath):
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
-    tempfile = (filepath.parent/(filepath.stem + "-temp")).with_suffix(filepath.suffix)
+    tempfile = append_to_path_stem(filepath, "-temp")
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
@@ -439,11 +443,11 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode):
 
 def split_two_side(page_index, filepath_tiff, width, height):
     if page_index != 0:
-        filepath_left_tiff = filepath_tiff.with_suffix(".0.tiff")
+        filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
         left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), filepath_tiff,
                             "-rotate", "-90", filepath_left_tiff], asynchronous=True)
     if page_index != -1:
-        filepath_right_tiff = filepath_tiff.with_suffix(".1.tiff")
+        filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
         silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), filepath_tiff,
                      "-rotate", "-90", filepath_right_tiff])
     tiff_filepaths = set()
