@@ -53,12 +53,12 @@ else:
     raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
 
-def path_to_own_program(name):
-    """Returns the path to an executable which resides in the same directory as
-    this script.
+def path_to_own_file(name):
+    """Returns the path to a file which resides in the same directory as this
+    script.
 
-    :param str name: name of the executable
-    :returns: full path to the executable
+    :param str name: name of the file
+    :returns: full path to the file
     :rtype: Path
     """
     return (Path(__file__).parent/name).resolve()
@@ -310,7 +310,7 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     """
     def clamp(x, max_):
         return min(max(x, 0), max_ - 1)
-    output = silent_call([path_to_own_program("analyze_scan.py"), clamp(x, 4000), clamp(y, 6000), scaling,
+    output = silent_call([path_to_own_file("analyze_scan.py"), clamp(x, 4000), clamp(y, 6000), scaling,
                           filepath, number_of_points], swallow_stdout=False).stdout
     result = json.loads(output)
     return result
@@ -420,7 +420,7 @@ def raw_to_corrected_pnm(filepath):
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
-        silent_call([path_to_own_program("undistort"), filepath] + correction_data.coordinates, swallow_stdout=False).stdout)
+        silent_call([path_to_own_file("undistort"), filepath] + correction_data.coordinates, swallow_stdout=False).stdout)
     return filepath, x0, y0, width, height
 
 
