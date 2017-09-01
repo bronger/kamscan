@@ -576,6 +576,50 @@ def split_two_side(page_index, filepath_tiff, width, height):
     return tiff_filepaths
 
 
+def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
+    """Generates the PDF pairs that are merged to the final pages.  Every page of
+    the final PDF consists of two layers: the invisible text layer and the
+    scan.  Here, we generate for a single page, or two pages in two-side mode,
+    the input PDFs needed for that.
+
+    This means that the inpurt lists either have one or two items.  In the
+    latter case, the ordering is left page, right page.  (As a side note, even
+    in two-side mode there may be only one item, namely for the first and the
+    last double page.)
+
+    The output tuples contain everything the following code must know, namely
+    the two input PDFs and the output PDF's name.  The latter is not generated
+    here.  This is the task of caller.
+
+    :param tiff_filepaths: paths to the TIFFs that should form the final PDF
+    :param ocr_tiff_filepaths: paths to the TIFFs that are used for OCR (and
+      discarded afterwards)
+    :param pathlib.Path output_path: directory where the PDFs are written to
+    :type tiff_filepaths: list[pathlib.Path]
+    :type ocr_filepaths: list[pathlib.Path]
+    :returns: Tuples which contain for each input item the path to the
+      text-only TIFF (the result of the OCR), the path to the PDF with the
+      scan, and the output path for the merged PDF.
+    :rtype: set[tuple[pathlib.Path, pathlib.Path, pathlib.Path]]
+    """
+    processes = set()
+    result = set()
+    for path, ocr_path in zip(tiff_filepaths, ocr_tiff_filepaths):
+        pdf_filepath = output_path/path.with_suffix(".pdf").name
+        textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
+        textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
+        tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1", "-l", args.language,
+                                 "pdf"], asynchronous=True)
+        pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
+        silent_call(["convert", path, "-compress", {"color": "JPEG", "gray": "JPEG", "mono": "Group4"}[args.mode],
+                     pdf_image_path])
+        processes.add(tesseract)
+        result.add((textonly_pdf_filepath, pdf_image_path, pdf_filepath))
+    for process in processes:
+        assert process.wait() == 0
+    return result
+
+
 def process_image(filepath, page_index, output_path):
     """Converts one raw image to a searchable single-page PDF.
 
@@ -599,20 +643,9 @@ def process_image(filepath, page_index, output_path):
     else:
         tiff_filepaths = [filepath_tiff]
         ocr_tiff_filepaths = [filepath_ocr_tiff]
-    processes = set()
-    for path, ocr_path in zip(tiff_filepaths, ocr_tiff_filepaths):
-        pdf_filepath = output_path/path.with_suffix(".pdf").name
-        textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
-        textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
-        tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1", "-l", args.language,
-                                 "pdf"], asynchronous=True)
-        pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
-        silent_call(["convert", path, "-compress", {"color": "JPEG", "gray": "JPEG", "mono": "Group4"}[args.mode],
-                     pdf_image_path])
-        processes.add((tesseract, textonly_pdf_filepath, pdf_image_path, pdf_filepath))
     result = set()
-    for tesseract, textonly_pdf_filepath, pdf_image_path, pdf_filepath in processes:
-        assert tesseract.wait() == 0
+    for textonly_pdf_filepath, pdf_image_path, pdf_filepath in \
+        single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
         silent_call(["pdftk", textonly_pdf_filepath, "multibackground", pdf_image_path, "output", pdf_filepath])
         result.add(pdf_filepath)
     return result
