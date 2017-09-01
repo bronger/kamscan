@@ -10,9 +10,10 @@ This script must reside in the same director as its helpers ``undistort`` and
 ``analyze_scan.py``.  It requires Python 3.5.
 """
 
-import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime
+import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re
 from contextlib import contextmanager
 from pathlib import Path
+import pytz
 
 
 data_root = Path.home()/"aktuell/kamscan"
@@ -29,7 +30,8 @@ parser.add_argument("--debug", action="store_true", help="debug mode; in particu
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
 parser.add_argument("--two-side", action="store_true", help="whether two-side images should be assumed; this swaps the "
                     "meanings of --height and --width, with --width being the width of a double page")
-parser.add_argument("filepath", type=Path, help="path to the PDF file for storing")
+parser.add_argument("filepath", type=Path, help="path to the PDF file for storing; name without extension must match "
+                    "YYYY-MM-DD_Title")
 args = parser.parse_args()
 
 assert "/" not in args.profile
@@ -41,6 +43,14 @@ elif args.calibration:
     page_height = args.full_height
 else:
     raise Exception("You can give --full-height only with --calibration.")
+
+match = re.match(r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<title>.*)$", args.filepath.stem)
+if match:
+    timestamp = datetime.datetime(int(match.group("year")), int(match.group("month")), int(match.group("day")),
+                                  tzinfo=pytz.UTC)
+    title = match.group("title").replace("_", " ")
+else:
+    raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
 
 def path_to_own_program(name):
@@ -56,6 +66,11 @@ def path_to_own_program(name):
 
 def append_to_path_stem(path, suffix):
     return (path.parent/(path.stem + suffix)).with_suffix(path.suffix)
+
+
+def datetime_to_pdf(timestamp):
+    timestamp = timestamp.strftime("D:%Y%m%d%H%M%S%z")
+    return "{}'{}'".format(timestamp[:-2], timestamp[-2:])
 
 
 def silent():
@@ -516,6 +531,28 @@ with tempfile.TemporaryDirectory() as tempdir:
     for result in results:
         pdfs.extend(result.get())
     pdfs.sort()
-    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
+    temp_pdf_path = tempdir/"all-pages.pdf"
+    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", temp_pdf_path])
+    info_filepath = tempdir/"info.txt"
+    with open(str(info_filepath), "w") as info_file:
+        now = datetime.datetime.now(pytz.utc).astimezone(pytz.timezone("Europe/Amsterdam"))
+        info_file.write("""InfoBegin
+InfoKey: Author
+InfoValue: Torsten Bronger
+InfoBegin
+InfoKey: Creator
+InfoValue: Kamscan
+InfoBegin
+InfoKey: CreationDate
+InfoValue: {}
+InfoBegin
+InfoKey: ModDate
+InfoValue: {}
+InfoBegin
+InfoKey: Title
+InfoValue: {}
+        """.format(datetime_to_pdf(timestamp), datetime_to_pdf(now), title))
+    silent_call(["pdftk", temp_pdf_path, "update_info_utf8", info_filepath, "output", args.filepath])
+
 
 silent_call(["evince", args.filepath])

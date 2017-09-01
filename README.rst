@@ -25,6 +25,7 @@ You need
 - Argyll CMS (in particular, cctiff)
 - dcraw
 - Kivy
+- pytz
 
 
 Installation
