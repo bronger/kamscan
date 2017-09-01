@@ -65,10 +65,33 @@ def path_to_own_file(name):
 
 
 def append_to_path_stem(path, suffix):
+    """Appends a suffix to the stem of a path.  The terms are important here.
+    “Suffix” is not meant in the sense of the pathlib library, which uses this
+    term in the sense of “file extension”.  On the other hand, “stem” is meant
+    in the sense of pathlib, i.e. a file name (rather than a path) without any
+    extension.  Thus, the call ::
+
+        append_to_path_stem(Path("a/b/c.d"), "-e")
+
+    will return ``Path("a/b/c-e.d")``.
+
+    :param pathlib.Path path: original path
+    :param str suffix: suffix to be appended
+    :returns: path with the suffix appended
+    :rtype: pathlib.Path
+    """
     return (path.parent/(path.stem + suffix)).with_suffix(path.suffix)
 
 
 def datetime_to_pdf(timestamp):
+    """Converts a timestamp to the format used by PDFtk in its `update_info`
+    command.  For example, the timestamp 2017-09-01 14:23:45 CEDT is converted
+    to ``D:20170901142345+02'00'``.
+
+    :param datetime.datetime timestamp: the timestamp
+    :returns: the timestamp in PDF metedata format
+    :rtype: str
+    """
     timestamp = timestamp.strftime("D:%Y%m%d%H%M%S%z")
     return "{}'{}'".format(timestamp[:-2], timestamp[-2:])
 
@@ -414,6 +437,35 @@ else:
 
 
 def raw_to_corrected_pnm(filepath):
+    """Converts a RAW file into a corrected PNM file.  The applied corrections are:
+
+    1. Vignetting
+    2. Inhomogeneous illumination
+    3. Exposure
+    4. Coloured corners (“Italian flag syndrome”)
+    5. White balance
+    6. Sensor dust
+    7. Reflections on a glass panel
+    8. Perspective correction
+    9. Lens distortion
+    10. Transversal chromatic aberration (TCA) of the lens
+    11. Rotation (page borders not parallel to image borders)
+
+    What's not corrected is a non-planar page.
+
+    The file extension of the result is ppm for colour mode, and pgm for grey
+    and monochrome mode.
+
+    The returned corner coordinates and dimensions refer to the pixel
+    coordinates of the calibration rectangle.  Since the real-world height of
+    this rectangle is known, this enables the software to crop the image
+    properly to the the desired page.
+
+    :param pathlib.Path filepath: path to the RAW file
+    :returns: path to the PNM file, coordinates of the full page's origin, and
+      its width and height; all in pixels from the top left
+    :rtype: pathlib.Path, float, float, float, float
+    """
     filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = append_to_path_stem(filepath, "-temp")
@@ -425,6 +477,18 @@ def raw_to_corrected_pnm(filepath):
 
 
 def calculate_pixel_dimensions(width, height):
+    """Returns the pixel width and height of the page rectangle, and the DPI.
+    This is the page rectangle rather than the calibration rectangle, i.e. the
+    ``--width`` and ``--height`` parameters (or their default values) are
+    used.  The returned dimensions denote the area that needs to be cropped out
+    of the original image.
+
+    :param float width: width of the calibration rectangle in pixels
+    :param float height: height of the calibration rectangle in pixels
+    :returns: width and height of the image crop in pixels, image density in
+      DPI
+    :rtype: float, float, float
+    """
     density = correction_data.density(height)
     if args.height is not None:
         height = (args.width if args.two_side else args.height) / 2.54 * density
@@ -434,6 +498,24 @@ def calculate_pixel_dimensions(width, height):
 
 
 def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=None):
+    """Crops the scan area out of the out-of-camera PNM file and saves it as a TIFF
+    file.  Moreover, it applies some colour optimisation, and puts the proper
+    DPI value in the output's metadata.
+
+    :param pathlib.Path filepath: path to the corrected PNM file; it is the
+      result of `raw_to_corrected_pnm`
+    :param float width: pixel width of the crop area
+    :param float height: pixel height of the crop area
+    :param float x0: x pixel coordinate of the top left corner of the crop area
+    :param float y0: y pixel coordinate of the top left corner of the crop area
+    :param float density: DPI of the image
+    :param str mode: colour mode; may be the values of the ``--mode`` option
+      plus ``gray_linear``, which is used for an OCR-optimised crop
+    :param str suffix: suffix to be appended to the stem to the resulting file
+      name; *not* a file extension
+    :returns: path to the result image
+    :rtype: pathlib.Path
+    """
     filepath_tiff = filepath.with_suffix(".tiff")
     if suffix:
         filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
@@ -459,6 +541,24 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
 
 
 def split_two_side(page_index, filepath_tiff, width, height):
+    """Crops the two pages out of the double-page scan.  Note that “width” is the
+    height of the double page page (and thus also of the single page), and
+    “height” is the width of the double page.
+
+    :param int page_index: Index of the current page.  In two-side mode, this
+      is the index of the current double page because separation of left and
+      right happens in this function.  Moreover, the last page has the index
+      -1.
+    :param pathlib.Path filepath_tiff: path to a TIFF with the scan area (i.e.,
+      the double page)
+    :param float width: pixel width of the crop area
+    :param float height: pixel height of the crop area
+    :returns: Paths to the two page images, left and right (in this ordering);
+      if it is the first double page, only the right half is returned.  If it
+      is the last double page, only the left half is returned.  Thus, the
+      resulting list either has one or two items.
+    :rtype: list[pathlib.Path]
+    """
     if page_index != 0:
         filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
         left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
