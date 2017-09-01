@@ -591,6 +591,13 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     the two input PDFs and the output PDF's name.  The latter is not generated
     here.  This is the task of caller.
 
+    By the way, normally, we don't parallelise in function called from
+    `process_image` because `process_image` itself is parallelised.  However, I
+    make an exception for the exceptionally expensive Tesseract call.  This is
+    beneficial for the single-page-scan case.  In other cases, at most two
+    Tesseract processes will be spawned here, which should not be a big
+    problem.
+
     :param tiff_filepaths: paths to the TIFFs that should form the final PDF
     :param ocr_tiff_filepaths: paths to the TIFFs that are used for OCR (and
       discarded afterwards)
