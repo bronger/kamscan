@@ -618,25 +618,19 @@ def process_image(filepath, page_index, output_path):
     return result
 
 
-with tempfile.TemporaryDirectory() as tempdir:
-    tempdir = Path(tempdir)
-    pool = multiprocessing.Pool()
-    results = set()
-    for index, path in camera.images(tempdir, wait_for_disconnect=False):
-        results.add(pool.apply_async(process_image, (path, index, tempdir)))
-    print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
-    pool.close()
-    pool.join()
-    pdfs = []
-    for result in results:
-        pdfs.extend(result.get())
-    pdfs.sort()
-    temp_pdf_path = tempdir/"all-pages.pdf"
-    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", temp_pdf_path])
-    info_filepath = tempdir/"info.txt"
-    with open(str(info_filepath), "w") as info_file:
-        now = datetime.datetime.now(pytz.utc).astimezone(pytz.timezone("Europe/Amsterdam"))
-        info_file.write("""InfoBegin
+def embed_pdf_metadata(filepath):
+    """Embeds metadata in a PDF.  It sets author, creator, title, and timestamp
+    data.  Note that this data is partly taken from the global variables
+    `timestamp` and `title`.  The given file is changed in place.
+
+    :param pathlib.Path filepath: path to the PDF file
+    """
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = Path(tempdir)
+        info_filepath = tempdir/"info.txt"
+        with open(str(info_filepath), "w") as info_file:
+            now = datetime.datetime.now(pytz.utc).astimezone(pytz.timezone("Europe/Amsterdam"))
+            info_file.write("""InfoBegin
 InfoKey: Author
 InfoValue: Torsten Bronger
 InfoBegin
@@ -652,7 +646,25 @@ InfoBegin
 InfoKey: Title
 InfoValue: {}
         """.format(datetime_to_pdf(timestamp), datetime_to_pdf(now), title))
-    silent_call(["pdftk", temp_pdf_path, "update_info_utf8", info_filepath, "output", args.filepath])
+        temp_filepath = tempdir/"temp.pdf"
+        silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
+        shutil.move(str(temp_filepath), str(filepath))
 
+
+with tempfile.TemporaryDirectory() as tempdir:
+    tempdir = Path(tempdir)
+    pool = multiprocessing.Pool()
+    results = set()
+    for index, path in camera.images(tempdir, wait_for_disconnect=False):
+        results.add(pool.apply_async(process_image, (path, index, tempdir)))
+    print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
+    pool.close()
+    pool.join()
+    pdfs = []
+    for result in results:
+        pdfs.extend(result.get())
+    pdfs.sort()
+    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
+    embed_pdf_metadata(args.filepath)
 
 silent_call(["evince", args.filepath])
