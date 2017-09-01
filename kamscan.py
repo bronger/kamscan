@@ -516,7 +516,6 @@ with tempfile.TemporaryDirectory() as tempdir:
     for result in results:
         pdfs.extend(result.get())
     pdfs.sort()
-    silent_call(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", "-dAutoRotatePages=/None", "-sOutputFile={}".format(
-        args.filepath)] + [pdf for pdf in pdfs])
+    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
 
 silent_call(["evince", args.filepath])
