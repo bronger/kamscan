@@ -437,7 +437,7 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
         convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
     elif mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,75%",
-                             "-dither", "None", "-monochrome", "-depth", "1", "-compress", "group4"])
+                             "-dither", "None", "-monochrome", "-depth", "1"])
     convert_call.extend(["-density", density, filepath_tiff])
     silent_call(convert_call)
     return filepath_tiff
@@ -492,7 +492,8 @@ def process_image(filepath, page_index, output_path):
         tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1", "-l", args.language,
                                  "pdf"], asynchronous=True)
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
-        silent_call(["convert", path, pdf_image_path])
+        silent_call(["convert", path, "-compress", {"color": "JPEG", "gray": "JPEG", "mono": "Group4"}[args.mode],
+                     pdf_image_path])
         processes.add((tesseract, textonly_pdf_filepath, pdf_image_path, pdf_filepath))
     result = set()
     for tesseract, textonly_pdf_filepath, pdf_image_path, pdf_filepath in processes:
