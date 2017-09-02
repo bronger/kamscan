@@ -30,6 +30,7 @@ parser.add_argument("--debug", action="store_true", help="debug mode; in particu
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
 parser.add_argument("--two-side", action="store_true", help="whether two-side images should be assumed; this swaps the "
                     "meanings of --height and --width, with --width being the width of a double page")
+parser.add_argument("--no-ocr", action="store_true", help="suppress OCR (much faster)")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing; name without extension must match "
                     "YYYY-MM-DD_Title")
 args = parser.parse_args()
@@ -613,14 +614,17 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     result = set()
     for path, ocr_path in zip(tiff_filepaths, ocr_tiff_filepaths):
         pdf_filepath = output_path/path.with_suffix(".pdf").name
-        textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
-        textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
-        tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1", "-l", args.language,
-                                 "pdf"], asynchronous=True)
+        if args.no_ocr:
+            textonly_pdf_filepath = None
+        else:
+            textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
+            textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
+            tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1",
+                                     "-l", args.language, "pdf"], asynchronous=True)
+            processes.add(tesseract)
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
         silent_call(["convert", path, "-compress", {"color": "JPEG", "gray": "JPEG", "mono": "Group4"}[args.mode],
                      pdf_image_path])
-        processes.add(tesseract)
         result.add((textonly_pdf_filepath, pdf_image_path, pdf_filepath))
     for process in processes:
         assert process.wait() == 0
@@ -653,7 +657,10 @@ def process_image(filepath, page_index, output_path):
     result = set()
     for textonly_pdf_filepath, pdf_image_path, pdf_filepath in \
         single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
-        silent_call(["pdftk", textonly_pdf_filepath, "multibackground", pdf_image_path, "output", pdf_filepath])
+        if textonly_pdf_filepath:
+            silent_call(["pdftk", textonly_pdf_filepath, "multibackground", pdf_image_path, "output", pdf_filepath])
+        else:
+            shutil.move(str(pdf_image_path), str(pdf_filepath))
         result.add(pdf_filepath)
     return result
 
