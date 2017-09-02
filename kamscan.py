@@ -623,8 +623,15 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
                                      "-l", args.language, "pdf"], asynchronous=True)
             processes.add(tesseract)
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
-        silent_call(["convert", path, "-compress", {"color": "JPEG", "gray": "JPEG", "mono": "Group4"}[args.mode],
-                     pdf_image_path])
+        if args.mode == "color":
+            compression_options = ["-compress", "JPEG"]
+        elif args.mode == "gray":
+            compression_options = ["-compress", "JPEG", "-quality", "30%"]
+        elif args.mode == "mono":
+            compression_options = ["-compress", "Group4"]
+        else:
+            compression_options = []
+        silent_call(["convert", path] + compression_options + [pdf_image_path])
         result.add((textonly_pdf_filepath, pdf_image_path, pdf_filepath))
     for process in processes:
         assert process.wait() == 0
