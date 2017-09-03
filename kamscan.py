@@ -491,10 +491,16 @@ def calculate_pixel_dimensions(width, height):
     :rtype: float, float, float
     """
     density = correction_data.density(height)
-    if args.height is not None:
-        height = (args.width if args.two_side else args.height) / 2.54 * density
-    if args.width is not None:
-        width = (args.height if args.two_side else args.width) / 2.54 * density
+    if args.two_side:
+        if args.height is not None:
+            width = args.height / 2.54 * density
+        if args.width is not None:
+            height = args.width / 2.54 * density
+    else:
+        if args.height is not None:
+            height = args.height / 2.54 * density
+        if args.width is not None:
+            width = args.width / 2.54 * density
     return width, height, density
 
 
