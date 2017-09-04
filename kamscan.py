@@ -532,15 +532,16 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
         silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
-    convert_call = ["convert", tempfile_tiff, "-linear-stretch", "2%x1%"]
+    convert_call = ["convert", tempfile_tiff]
     if mode == "color":
-        convert_call.extend(["-set", "colorspace", "Lab", "-depth", "8", "-colorspace", "sRGB"])
+        convert_call.extend(["-set", "colorspace", "Lab", "-colorspace", "RGB", "-linear-stretch", "2%x1%",
+                             "-depth", "8", "-colorspace", "sRGB"])
     elif mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray", "-gamma", "2.2", "-depth", "8"])
+        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-gamma", "2.2", "-depth", "8"])
     elif mode == "gray_linear":
-        convert_call.extend(["-set", "colorspace", "gray", "-depth", "8"])
+        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-depth", "8"])
     elif mode == "mono":
-        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,75%",
+        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-level", "10%,75%",
                              "-dither", "None", "-monochrome", "-depth", "1"])
     convert_call.extend(["-density", density, filepath_tiff])
     silent_call(convert_call)
