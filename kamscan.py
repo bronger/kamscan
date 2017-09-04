@@ -363,7 +363,10 @@ def analyze_calibration_image():
       camera storage, or none
     """
     def get_points(path):
-        ppm_path = call_dcraw(path, extra_raw=False)
+        temp_path = append_to_path_stem(path, "-unraw")
+        # For avoiding a race with the flat field PPM generation.
+        os.rename(str(path), str(temp_path))
+        ppm_path = call_dcraw(temp_path, extra_raw=False)
         raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
         return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
