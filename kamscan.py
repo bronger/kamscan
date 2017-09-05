@@ -13,7 +13,7 @@ This script must reside in the same director as its helpers ``undistort`` and
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re
 from contextlib import contextmanager
 from pathlib import Path
-import pytz
+import pytz, yaml
 
 
 data_root = Path.home()/"aktuell/kamscan"
@@ -403,6 +403,12 @@ def analyze_calibration_image():
             else:
                 correction_data.coordinates[6:8] = point
     return correction_data
+
+
+try:
+    configuration = yaml.load(open(str(Path.home()/".kamscan.yaml")))
+except FileNotFoundError:
+    configuration = {}
 
 
 def prune_profiles():

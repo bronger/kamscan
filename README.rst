@@ -26,6 +26,7 @@ You need
 - dcraw
 - Kivy
 - pytz
+- PyYAML
 
 
 Installation
