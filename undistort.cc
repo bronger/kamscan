@@ -12,6 +12,8 @@
    - y coordinate of bottom left corner
    - x coordinate of bottom right corner
    - y coordinate of bottom right corner
+   - Lensfun name of camera
+   - Lensfun name of lens
 
    All coordinates are pixel coordinates, with the top left of the image the
    origin.  The corners must be the corners of a perfect rectangle which was
@@ -31,11 +33,6 @@
 
    This program does not apply colour corrections such as vignetting
    correction, as those are handled by kamscan.py using flat field images.
-
-   \b Important: This program has my lens hardcoded into it, the 50mm f/1.8 OSS
-   for the Sony E mount.  It was necessary to make a special calibration for
-   the finite distance to the subject.  Lensfun contains corrections for focus
-   at infinity.
 */
 #include <fstream>
 #include <vector>
@@ -217,8 +214,9 @@ std::ostream& operator<<(std::ostream &outputStream, const Image &other)
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 10) {
-        std::cerr << "You must give path to input file as well as all four corner coordinates.\n";
+    if (argc != 12) {
+        std::cerr << "You must give path to input file as well as all four corner coordinates,\n"
+                  << "and camera and lens model.\n";
         return -1;
     }
 
@@ -230,7 +228,7 @@ int main(int argc, char* argv[]) {
     }
 
     const lfCamera *camera;
-    const lfCamera **cameras = ldb.FindCamerasExt(NULL, "NEX-7");
+    const lfCamera **cameras = ldb.FindCamerasExt(NULL, argv[10]);
     if (cameras && !cameras[1])
         camera = cameras[0];
     else {
@@ -241,7 +239,7 @@ int main(int argc, char* argv[]) {
     lf_free(cameras);
 
     const lfLens *lens;
-    const lfLens **lenses = ldb.FindLenses(camera, NULL, "E 50mm f/1.8 OSS (kamscan)");
+    const lfLens **lenses = ldb.FindLenses(camera, NULL, argv[11]);
     if (lenses && !lenses[1]) {
         lens = lenses[0];
     } else if (!lenses) {

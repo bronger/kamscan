@@ -476,7 +476,8 @@ def raw_to_corrected_pnm(filepath):
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
-        silent_call([path_to_own_file("undistort"), filepath] + correction_data.coordinates, swallow_stdout=False).stdout)
+        silent_call([path_to_own_file("undistort"), filepath] + correction_data.coordinates +
+                    ["NEX-7", "E 50mm f/1.8 OSS (kamscan)"], swallow_stdout=False).stdout)
     return filepath, x0, y0, width, height
 
 
