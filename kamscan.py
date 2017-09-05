@@ -303,6 +303,8 @@ class CorrectionData:
     def __init__(self):
         self.coordinates = 8 * [None]
         self.height_in_cm = page_height
+        self.camera = None
+        self.lens = None
 
     def density(self, height_in_pixel):
         """Returns the DPI (dots per inch) of the scan.
@@ -322,7 +324,8 @@ class CorrectionData:
         :returns: string representation of this object
         :rtype: str
         """
-        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}".format(*self.coordinates)
+        return "links oben: {}, {}  rechts oben: {}, {}  links unten: {}, {}  rechts unten: {}, {}  " \
+            "Kamera: '{}'  Objektiv: '{}'".format(*(self.coordinates + [self.camera, self.lens]))
 
 
 def analyze_scan(x, y, scaling, filepath, number_of_points):
@@ -432,8 +435,35 @@ def get_correction_data():
     :returns: correction data for the current profile
     :rtype: CorrectionData
     """
+    def input_choice(configuration_name, correction_attribute_name):
+        """Sets an attribute in `correction_data` according to user input.  The
+        user is given choices from the configuration file ``~/.kamscan.yaml``.
+        For example, it may contain::
+
+            cameras:
+              "1": NEX-7
+              "2": Alpha 6500
+
+        Then, the user may enter, say, “1” for setting the profile to NEX-7.
+        Note that the dictionary keys in the configuration file must be
+        strings.
+
+        :param str configuration_name: name of the dictionary in the
+          configuration file, e.g. “cameras”
+        :param str correction_attribute_name: name of the attribute in the
+          `CorrectionData` singleton
+        """
+        if configuration_name in configuration:
+            for name, item in configuration[configuration_name].items():
+                print("{}: {}".format(name, item))
+            setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
+        else:
+            setattr(correction_data, correction_attribute_name, input(correction_attribute_name + "? "))
     print("Calibration is necessary.  First the flat field, then for the position, or one image for both …")
     correction_data = analyze_calibration_image()
+    input_choice("cameras", "camera")
+    print()
+    input_choice("lenses", "lens")
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
 
@@ -483,7 +513,7 @@ def raw_to_corrected_pnm(filepath):
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
         silent_call([path_to_own_file("undistort"), filepath] + correction_data.coordinates +
-                    ["NEX-7", "E 50mm f/1.8 OSS (kamscan)"], swallow_stdout=False).stdout)
+                    [correction_data.camera, correction_data.lens], swallow_stdout=False).stdout)
     return filepath, x0, y0, width, height
 
 
