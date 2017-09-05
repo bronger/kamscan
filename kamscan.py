@@ -419,8 +419,8 @@ def prune_profiles():
     minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
     minutes = max(minutes, 4 * 60)
     silent_call(["find", data_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
-os.makedirs(str(profile_root), exist_ok=True)
 prune_profiles()
+os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
 
 def get_correction_data():
