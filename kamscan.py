@@ -22,7 +22,8 @@ except FileNotFoundError:
     configuration = {}
 
 
-data_root = Path.home()/"aktuell/kamscan"
+data_root = Path.home()/".config/kamscan"
+profiles_root = data_root/"profiles"
 
 parser = argparse.ArgumentParser(description="Scan a document.")
 parser.add_argument("--calibration", action="store_true", help="force taking a calibration image")
@@ -42,7 +43,7 @@ parser.add_argument("filepath", type=Path, help="path to the PDF file for storin
 args = parser.parse_args()
 
 assert "/" not in args.profile
-profile_root = data_root/args.profile
+profile_root = profiles_root/args.profile
 
 if args.full_height is None:
     page_height = 29.7
@@ -421,7 +422,7 @@ def prune_profiles():
     now = datetime.datetime.now()
     minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
     minutes = max(minutes, 4 * 60)
-    silent_call(["find", data_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
+    silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
 prune_profiles()
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
