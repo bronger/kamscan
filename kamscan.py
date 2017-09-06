@@ -149,13 +149,21 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
 
 class Camera:
     """Class with abstracts the interface to a camera.
-    """
-    path = Path("/media/bronger/3937-6637/DCIM")
-    """Path to the directory which contains the image files if the camera's storage
-    is mounted.  All subdirectories are searched for images as well.
+
+    :var path: Path to the directory which contains the image files if the
+      camera's storage is mounted.  All subdirectories are searched for images
+      as well.
+    :type path: pathlib.Path
     """
 
-    def __init__(self):
+    def __init__(self, configuration):
+        """Class constructor.
+
+        :param configuration: global configuration, as read from
+          ``configuration.yaml``.
+        :type configuration: dict[str, object]
+        """
+        self.path = Path(configuration["camera_mount_path"])
         with self._camera_connected():
             self.paths = self._collect_paths()
 
@@ -251,7 +259,7 @@ class Camera:
                         break
             assert rsync.wait() == 0
 
-camera = Camera()
+camera = Camera(configuration)
 
 
 def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
