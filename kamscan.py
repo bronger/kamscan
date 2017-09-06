@@ -17,7 +17,7 @@ import pytz, yaml
 
 
 try:
-    configuration = yaml.load(open(str(Path.home()/".kamscan.yaml")))
+    configuration = yaml.load(open(str(Path.home()/".config/kamscan/configuration.yaml")))
 except FileNotFoundError:
     configuration = {}
 
@@ -437,9 +437,10 @@ def get_correction_data():
     :rtype: CorrectionData
     """
     def input_choice(configuration_name, correction_attribute_name):
-        """Sets an attribute in `correction_data` according to user input.  The
-        user is given choices from the configuration file ``~/.kamscan.yaml``.
-        For example, it may contain::
+        """Sets an attribute in `correction_data` according to user input.  The user is
+        given choices from the configuration file
+        ``~/.config/kamscan/configuration.yaml``.  For example, it may
+        contain::
 
             cameras:
               "1": NEX-7
