@@ -22,7 +22,7 @@ except FileNotFoundError:
     configuration = {}
 
 
-data_root = Path.home()/".config/kamscan"
+data_root = Path(configuration["data_path"]) if "data_path" in configuration else Path.home()/".config/kamscan"
 profiles_root = data_root/"profiles"
 
 parser = argparse.ArgumentParser(description="Scan a document.")
