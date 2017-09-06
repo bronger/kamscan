@@ -443,8 +443,13 @@ def get_correction_data():
         contain::
 
             cameras:
-              "1": NEX-7
-              "2": Alpha 6500
+              "1":
+                - Sony
+                - NEX-7
+            lenses:
+              "1":
+                - Sony
+                - E 50mm f/1.8 OSS (kamscan)
 
         Then, the user may enter, say, “1” for setting the profile to NEX-7.
         Note that the dictionary keys in the configuration file must be
@@ -456,11 +461,13 @@ def get_correction_data():
           `CorrectionData` singleton
         """
         if configuration_name in configuration:
-            for name, item in configuration[configuration_name].items():
-                print("{}: {}".format(name, item))
+            for name, make_and_model in configuration[configuration_name].items():
+                print("{0}: {1[0]}, {1[1]}".format(name, make_and_model))
             setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
         else:
-            setattr(correction_data, correction_attribute_name, input(correction_attribute_name + "? "))
+            make = input(correction_attribute_name + " make? ")
+            model = input(correction_attribute_name + " model? ")
+            setattr(correction_data, correction_attribute_name, (make, model))
     print("Calibration is necessary.  First the flat field, then for the position, or one image for both …")
     correction_data = analyze_calibration_image()
     input_choice("cameras", "camera")
@@ -515,7 +522,7 @@ def raw_to_corrected_pnm(filepath):
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = json.loads(
         silent_call([path_to_own_file("undistort"), filepath] + correction_data.coordinates +
-                    [correction_data.camera, correction_data.lens], swallow_stdout=False).stdout)
+                    correction_data.camera + correction_data.lens, swallow_stdout=False).stdout)
     return filepath, x0, y0, width, height
 
 

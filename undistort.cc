@@ -12,8 +12,10 @@
    - y coordinate of bottom left corner
    - x coordinate of bottom right corner
    - y coordinate of bottom right corner
-   - Lensfun name of camera
-   - Lensfun name of lens
+   - Lensfun name of camera make
+   - Lensfun name of camera model
+   - Lensfun name of lens make
+   - Lensfun name of lens model
 
    All coordinates are pixel coordinates, with the top left of the image the
    origin.  The corners must be the corners of a perfect rectangle which was
@@ -214,9 +216,9 @@ std::ostream& operator<<(std::ostream &outputStream, const Image &other)
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 12) {
+    if (argc != 14) {
         std::cerr << "You must give path to input file as well as all four corner coordinates,\n"
-                  << "and camera and lens model.\n";
+                  << "and camera make/model and lens make/model.\n";
         return -1;
     }
 
@@ -228,7 +230,7 @@ int main(int argc, char* argv[]) {
     }
 
     const lfCamera *camera;
-    const lfCamera **cameras = ldb.FindCamerasExt(NULL, argv[10]);
+    const lfCamera **cameras = ldb.FindCamerasExt(argv[10], argv[11]);
     if (cameras && !cameras[1])
         camera = cameras[0];
     else {
@@ -239,7 +241,7 @@ int main(int argc, char* argv[]) {
     lf_free(cameras);
 
     const lfLens *lens;
-    const lfLens **lenses = ldb.FindLenses(camera, NULL, argv[11]);
+    const lfLens **lenses = ldb.FindLenses(camera, argv[12], argv[13]);
     if (lenses && !lenses[1]) {
         lens = lenses[0];
     } else if (!lenses) {
