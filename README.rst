@@ -119,14 +119,7 @@ Some hints going beyond the output of ``kamscan.py --help``:
 Limitations
 ============
 
-The limitations are serious at the current stage of development.  In fact, the
-program is only useful to me, I'm afraid.
-
-In particular, some things are hardcoded, e.g. the path to the input colour
-profile of the camera or the path of the mount point of the camera on my
-computer.  Also, the utility undistort.cc contains hardcoded things.  Moreover,
-there is no place yet to add support for further camera models, especially
-those with tethering support.
+No tethering is supported, only USB-stick-like mounting of the camera.
 
 Moreover, any bent pages are a problem.  They should be as flat as possible
 because no correction of any curvature takes place.

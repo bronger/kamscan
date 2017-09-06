@@ -1,10 +1,6 @@
 #!/usr/bin/python3
 
 """Takes pictures with a photo camera and converts them to a PDF document.
-Currently, this is specific to my (Torsten Bronger) specific setup.  In
-particular, some things are hardcoded, e.g. the path to the input colour
-profile of the camera or the path of the mount point of the camera on my
-computer.  Also, the utility undistort.cc contains hardcoded things.
 
 This script must reside in the same director as its helpers ``undistort`` and
 ``analyze_scan.py``.  It requires Python 3.5.
