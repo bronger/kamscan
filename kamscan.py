@@ -568,8 +568,8 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
         filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
     tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
-    if mode == "color":
-        silent_call(["cctiff", "/home/bronger/.config/darktable/color/in/nex7_matrix.icc", filepath_tiff, tempfile_tiff])
+    if mode == "color" and "icc_profile" in configuration:
+        silent_call(["cctiff", configuration["icc_profile"], filepath_tiff, tempfile_tiff])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
     convert_call = ["convert", tempfile_tiff]
