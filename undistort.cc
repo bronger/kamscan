@@ -250,6 +250,8 @@ int main(int argc, char* argv[]) {
         return -1;
     } else {
         std::cerr << "Lens name ambiguous\n";
+        lf_free(lenses);
+        return -1;
     }
     lf_free(lenses);
 
