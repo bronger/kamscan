@@ -2,7 +2,7 @@
 
 """Takes pictures with a photo camera and converts them to a PDF document.
 
-This script must reside in the same director as its helpers ``undistort`` and
+This script must reside in the same directory as its helpers ``undistort`` and
 ``analyze_scan.py``.  It requires Python 3.5.
 """
 
