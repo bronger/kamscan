@@ -36,6 +36,7 @@
    This program does not apply colour corrections such as vignetting
    correction, as those are handled by kamscan.py using flat field images.
 */
+#include <Python.h>
 #include <fstream>
 #include <vector>
 #include <iterator>
@@ -215,49 +216,52 @@ std::ostream& operator<<(std::ostream &outputStream, const Image &other)
     return outputStream;
 }
 
-int main(int argc, char* argv[]) {
-    if (argc != 14) {
-        std::cerr << "You must give path to input file as well as all four corner coordinates,\n"
-                  << "and camera make/model and lens make/model.\n";
-        return -1;
-    }
+static PyObject *undistort(PyObject *self, PyObject *args) {
+    const char *filename, *camera_make, *camera_model, *lens_make, *lens_model;
+    float x0, y0, x1, y1, x2, y2, x3, y3;
+    PyArg_ParseTuple(args, "sffffffffssss", &filename, &x0, &y0, &x1, &y1, &x2, &y2, &x3, &y3,
+                     &camera_make, &camera_model, &lens_make, &lens_model);
 
     lfDatabase ldb;
 
     if (ldb.Load() != LF_NO_ERROR) {
-        std::cerr << "Database could not be loaded\n";
-        return -1;
+        PyErr_SetString(PyExc_RuntimeError, "Database could not be loaded");
+        return NULL;
     }
 
     const lfCamera *camera;
-    const lfCamera **cameras = ldb.FindCamerasExt(argv[10], argv[11]);
+    const lfCamera **cameras = ldb.FindCamerasExt(camera_make, camera_model);
     if (cameras && !cameras[1])
         camera = cameras[0];
     else {
-        std::cerr << "Cannot find unique camera in database.  " << sizeof(cameras) << " cameras found.\n";
+        std::vector<char> buffer(std::snprintf(nullptr, 0, "Cannot find unique camera in database.  %i cameras found.",
+                                               (int)sizeof(cameras)));
+        std::snprintf(&buffer[0], buffer.size(), "Cannot find unique camera in database.  %i cameras found.",
+                      (int)sizeof(cameras));
+        PyErr_SetString(PyExc_RuntimeError, buffer.data());
         lf_free(cameras);
-        return -1;
+        return NULL;
     }
     lf_free(cameras);
 
     const lfLens *lens;
-    const lfLens **lenses = ldb.FindLenses(camera, argv[12], argv[13]);
+    const lfLens **lenses = ldb.FindLenses(camera, lens_make, lens_model);
     if (lenses && !lenses[1]) {
         lens = lenses[0];
     } else if (!lenses) {
-        std::cerr << "Cannot find lens in database\n";
+        PyErr_SetString(PyExc_RuntimeError, "Cannot find lens in database");
         lf_free(lenses);
-        return -1;
+        return NULL;
     } else {
-        std::cerr << "Lens name ambiguous\n";
+        PyErr_SetString(PyExc_RuntimeError, "Lens name ambiguous");
         lf_free(lenses);
-        return -1;
+        return NULL;
     }
     lf_free(lenses);
 
     Image image;
     {
-        std::ifstream file(argv[1], std::ios::binary);
+        std::ifstream file(filename, std::ios::binary);
         file >> image;
     }
 
@@ -266,32 +270,32 @@ int main(int argc, char* argv[]) {
     lfModifier back_modifier(camera->CropFactor, image.width, image.height, image.pixel_format(), true);
     if (!modifier.EnableDistortionCorrection(lens, 50) || !back_modifier.EnableDistortionCorrection(lens, 50) ||
         !pc_coord_modifier.EnableDistortionCorrection(lens, 50)) {
-        std::cerr << "Failed to activate undistortion\n";
-        return -1;
+        PyErr_SetString(PyExc_RuntimeError, "Failed to activate undistortion");
+        return NULL;
     }
     if (image.channels == 3)
         if (!modifier.EnableTCACorrection(lens, 50)) {
-            std::cerr << "Failed to activate un-TCA\n";
-            return -1;
+            PyErr_SetString(PyExc_RuntimeError, "Failed to activate un-TCA");
+            return NULL;
         }
     std::vector<float> x, y;
-    x.push_back(std::stof(argv[2]));
-    y.push_back(std::stof(argv[3]));
+    x.push_back(x0);
+    y.push_back(y0);
 
-    x.push_back(std::stof(argv[6]));
-    y.push_back(std::stof(argv[7]));
+    x.push_back(x2);
+    y.push_back(y2);
 
-    x.push_back(std::stof(argv[4]));
-    y.push_back(std::stof(argv[5]));
+    x.push_back(x1);
+    y.push_back(y1);
 
-    x.push_back(std::stof(argv[8]));
-    y.push_back(std::stof(argv[9]));
+    x.push_back(x3);
+    y.push_back(y3);
 
-    x.push_back(std::stof(argv[2]));
-    y.push_back(std::stof(argv[3]));
+    x.push_back(x0);
+    y.push_back(y0);
 
-    x.push_back(std::stof(argv[4]));
-    y.push_back(std::stof(argv[5]));
+    x.push_back(x1);
+    y.push_back(y1);
     std::vector<float> x_undist, y_undist;
     for (int i = 0; i < x.size(); i++) {
         float result[2];
@@ -301,8 +305,8 @@ int main(int argc, char* argv[]) {
     }
     if (!modifier.EnablePerspectiveCorrection(lens, 50, x_undist.data(), y_undist.data(), 6, 0) ||
         !back_modifier.EnablePerspectiveCorrection(lens, 50, x_undist.data(), y_undist.data(), 6, 0)) {
-        std::cerr << "Failed to activate perspective correction\n";
-        return -1;
+        PyErr_SetString(PyExc_RuntimeError, "Failed to activate perspective correction");
+        return NULL;
     }
 
     std::vector<float> res(image.width * image.height * 2 * image.channels);
@@ -326,7 +330,7 @@ int main(int argc, char* argv[]) {
                 new_image.set(x, y, 2, image.get(source_x_B, source_y_B, 2));
             }
         }
-    std::ofstream file(argv[1], std::ios::binary);
+    std::ofstream file(filename, std::ios::binary);
     file << new_image;
 
     for (int i = 0; i < 4; i++) {
@@ -335,8 +339,22 @@ int main(int argc, char* argv[]) {
         x[i] = result[0];
         y[i] = result[1];
     }
-    std::cout << "[" << std::min(x[0], x[2]) << ", " << std::min(y[0], y[1]) <<
-        ", " << std::max(x[1], x[3]) - std::min(x[0], x[2]) << ", " << std::max(y[2], y[3]) - std::min(y[0], y[1]) << "]\n";
     
-    return 0;
+    return Py_BuildValue("ffff", std::min(x[0], x[2]), std::min(y[0], y[1]),
+                         std::max(x[1], x[3]) - std::min(x[0], x[2]), std::max(y[2], y[3]) - std::min(y[0], y[1]));
+}
+
+static PyMethodDef UndistortMethods[] = {
+    {"undistort",  undistort, METH_VARARGS, "Undistort PNM image data."},
+    {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef undistortmodule = {
+   PyModuleDef_HEAD_INIT, "undistort", NULL, -1, UndistortMethods
+};
+
+PyMODINIT_FUNC
+PyInit_undistort(void)
+{
+    return PyModule_Create(&undistortmodule);
 }

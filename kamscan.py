@@ -10,6 +10,7 @@ import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiproc
 from contextlib import contextmanager
 from pathlib import Path
 import pytz, yaml
+import undistort
 
 
 try:
@@ -524,9 +525,8 @@ def raw_to_corrected_pnm(filepath):
     tempfile = append_to_path_stem(filepath, "-temp")
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
-    x0, y0, width, height = json.loads(
-        silent_call([path_to_own_file("undistort"), filepath] + correction_data.coordinates +
-                    correction_data.camera + correction_data.lens, swallow_stdout=False).stdout)
+    x0, y0, width, height = undistort.undistort(filepath, *(correction_data.coordinates +
+                                                            correction_data.camera + correction_data.lens))
     return filepath, x0, y0, width, height
 
 
