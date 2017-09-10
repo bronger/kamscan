@@ -496,7 +496,13 @@ def get_correction_data():
         if configuration_name in configuration:
             for name, make_and_model in configuration[configuration_name].items():
                 print("{0}: {1[0]}, {1[1]}".format(name, make_and_model))
-            setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
+            while True:
+                try:
+                    setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
+                except KeyError:
+                    print("Invalid input.")
+                else:
+                    break
         else:
             make = input(correction_attribute_name + " make? ")
             model = input(correction_attribute_name + " model? ")
