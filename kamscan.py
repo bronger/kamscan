@@ -423,10 +423,11 @@ def prune_profiles():
     """Removes profiles that are older than 5 o'clock of today, and at least 4
     hours old.
     """
-    now = datetime.datetime.now()
-    minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
-    minutes = max(minutes, 4 * 60)
-    silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
+    if profiles_root.exists():
+        now = datetime.datetime.now()
+        minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
+        minutes = max(minutes, 4 * 60)
+        silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
 prune_profiles()
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
