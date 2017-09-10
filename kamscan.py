@@ -622,10 +622,10 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
         os.rename(str(filepath_tiff), str(tempfile_tiff))
     convert_call = ["convert", tempfile_tiff]
     if mode == "color":
-        convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB", "-linear-stretch", "2%x1%",
+        convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB", "-level", "12.5%,100%",
                              "-depth", "8", "-colorspace", "sRGB"])
     elif mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-gamma", "2.2", "-depth", "8"])
+        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,100%", "-gamma", "2.2", "-depth", "8"])
     elif mode == "gray_linear":
         convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-depth", "8"])
     elif mode == "mono":
