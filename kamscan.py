@@ -50,8 +50,19 @@ else:
 
 match = re.match(r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<title>.*)$", args.filepath.stem)
 if match:
-    timestamp = datetime.datetime(int(match.group("year")), int(match.group("month")), int(match.group("day")),
-                                  tzinfo=pytz.UTC)
+    year, month, day = int(match.group("year")), int(match.group("month")), int(match.group("day"))
+    if year == 0:
+        year, month, day = 1970, 1, 1
+        timestamp_accuracy = "none"
+    elif month == 0:
+        month, day = 1, 1
+        timestamp_accuracy = "year"
+    elif day == 0:
+        day = 1
+        timestamp_accuracy = "month"
+    else:
+        timestamp_accuracy = "full"
+    timestamp = datetime.datetime(year, month, day, tzinfo=pytz.UTC)
     title = match.group("title").replace("_", " ")
 else:
     raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
@@ -87,17 +98,29 @@ def append_to_path_stem(path, suffix):
     return (path.parent/(path.stem + suffix)).with_suffix(path.suffix)
 
 
-def datetime_to_pdf(timestamp):
+def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     """Converts a timestamp to the format used by PDFtk in its `update_info`
     command.  For example, the timestamp 2017-09-01 14:23:45 CEDT is converted
     to ``D:20170901142345+02'00'``.
 
     :param datetime.datetime timestamp: the timestamp
+    :param str timestamp_accuracy: Determines the significant parts of the
+      timestamp.  Only those are output.  Possible values are ``"year"``,
+      ``"month"``, ``"day"``, and ``"full"``.  For example, , ``"month"`` means
+      the output may be ``"D:201709"``.
     :returns: the timestamp in PDF metedata format
     :rtype: str
     """
-    timestamp = timestamp.strftime("D:%Y%m%d%H%M%S%z")
-    return "{}'{}'".format(timestamp[:-2], timestamp[-2:])
+    if timestamp_accuracy == "year":
+        timestamp = timestamp.strftime("D:%Y")
+    elif timestamp_accuracy == "month":
+        timestamp = timestamp.strftime("D:%Y%m")
+    elif timestamp_accuracy == "day":
+        timestamp = timestamp.strftime("D:%Y%m%d")
+    elif timestamp_accuracy == "full":
+        timestamp = timestamp.strftime("D:%Y%m%d%H%M%S%z")
+        timestamp = "{}'{}'".format(timestamp[:-2], timestamp[-2:])
+    return timestamp
 
 
 def silent():
@@ -752,15 +775,17 @@ InfoBegin
 InfoKey: Creator
 InfoValue: Kamscan
 InfoBegin
-InfoKey: CreationDate
-InfoValue: {}
-InfoBegin
 InfoKey: ModDate
 InfoValue: {}
 InfoBegin
 InfoKey: Title
 InfoValue: {}
-        """.format(datetime_to_pdf(timestamp), datetime_to_pdf(now), title))
+""".format(datetime_to_pdf(now), title))
+            if timestamp_accuracy != "none":
+                info_file.write("""InfoBegin
+InfoKey: CreationDate
+InfoValue: {}
+""".format(datetime_to_pdf(timestamp, timestamp_accuracy)))
         temp_filepath = tempdir/"temp.pdf"
         silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
         shutil.move(str(temp_filepath), str(filepath))
