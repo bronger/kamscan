@@ -67,6 +67,11 @@ if match:
 else:
     raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
+if "icc_profile" in configuration:
+    icc_path, icc_color_space = configuration["icc_profile"]
+    icc_path = Path(icc_path)
+else:
+    icc_path, icc_color_space = None, "RGB"
 
 def path_to_own_file(name):
     """Returns the path to a file which resides in the same directory as this
@@ -605,13 +610,13 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
         filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
     tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
-    if mode == "color" and "icc_profile" in configuration:
-        silent_call(["cctiff", configuration["icc_profile"], filepath_tiff, tempfile_tiff])
+    if mode == "color" and icc_path:
+        silent_call(["cctiff", icc_path, filepath_tiff, tempfile_tiff])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
     convert_call = ["convert", tempfile_tiff]
     if mode == "color":
-        convert_call.extend(["-set", "colorspace", "Lab", "-colorspace", "RGB", "-linear-stretch", "2%x1%",
+        convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB", "-linear-stretch", "2%x1%",
                              "-depth", "8", "-colorspace", "sRGB"])
     elif mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-gamma", "2.2", "-depth", "8"])
