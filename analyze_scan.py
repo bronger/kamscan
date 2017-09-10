@@ -1,5 +1,21 @@
 #!/usr/bin/python3
 
+"""Reads an image and lets the user click on positions of that image.  The
+resulting pixel cooredinates are returned to the calling process on stdout, in
+JSON format.  It is a list of four two-tuples, which represent the (x, y)
+coordinates of the four corners in arbitrary order.
+
+The command-line parameters are:
+
+- x coordinate of the ROI centre
+- y coordinate of the ROI centre
+- scaling
+- path to image
+- number of points to click
+
+The image can be any file format that ImageMagick can handle.
+"""
+
 import subprocess, json, sys, os
 os.environ["KIVY_NO_FILELOG"] = "1"
 os.environ["KIVY_NO_CONSOLELOG"] = "1"
