@@ -766,11 +766,14 @@ InfoValue: {}
         shutil.move(str(temp_filepath), str(filepath))
 
 
+start = None
 with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
     for index, path in camera.images(tempdir, wait_for_disconnect=False):
+        if start is None:
+            start = time.time()
         results.add(pool.apply_async(process_image, (path, index, tempdir)))
     print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
     pool.close()
@@ -781,5 +784,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     pdfs.sort()
     silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
     embed_pdf_metadata(args.filepath)
+if args.debug:
+    print("Time elapsed in seconds:", time.time() - start)
 
 silent_call(["evince", args.filepath])
