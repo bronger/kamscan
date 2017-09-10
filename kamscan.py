@@ -719,7 +719,7 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
             processes.add(tesseract)
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
         if args.mode == "color":
-            compression_options = ["-compress", "JPEG"]
+            compression_options = ["-compress", "JPEG", "-quality", "30%"]
         elif args.mode == "gray":
             compression_options = ["-compress", "JPEG", "-quality", "30%"]
         elif args.mode == "mono":
