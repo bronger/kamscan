@@ -238,6 +238,8 @@ static PyObject *undistort(PyObject *self, PyObject *args) {
                                                (int)sizeof(cameras)));
         std::snprintf(&buffer[0], buffer.size(), "Cannot find unique camera in database.  %i cameras found.",
                       (int)sizeof(cameras));
+        // FixMe: Is the second argument really copied on the other side?
+        // Because buffer.data() will be free'ed after the return.
         PyErr_SetString(PyExc_RuntimeError, buffer.data());
         lf_free(cameras);
         return NULL;
