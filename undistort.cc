@@ -44,7 +44,7 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
-#include "lensfun.h"
+#include "lensfun/lensfun.h"
 
 /** Class for bitmap data.
 
