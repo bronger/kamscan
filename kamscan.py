@@ -51,12 +51,28 @@ else:
 
 match = re.match(r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<title>.*)$", args.filepath.stem)
 if match:
-    timestamp = datetime.datetime(int(match.group("year")), int(match.group("month")), int(match.group("day")),
-                                  tzinfo=pytz.UTC)
+    year, month, day = int(match.group("year")), int(match.group("month")), int(match.group("day"))
+    if year == 0:
+        year, month, day = 1970, 1, 1
+        timestamp_accuracy = "none"
+    elif month == 0:
+        month, day = 1, 1
+        timestamp_accuracy = "year"
+    elif day == 0:
+        day = 1
+        timestamp_accuracy = "month"
+    else:
+        timestamp_accuracy = "full"
+    timestamp = datetime.datetime(year, month, day, tzinfo=pytz.UTC)
     title = match.group("title").replace("_", " ")
 else:
     raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
+if "icc_profile" in configuration:
+    icc_path, icc_color_space = configuration["icc_profile"]
+    icc_path = Path(icc_path)
+else:
+    icc_path, icc_color_space = None, "RGB"
 
 def path_to_own_file(name):
     """Returns the path to a file which resides in the same directory as this
@@ -88,17 +104,29 @@ def append_to_path_stem(path, suffix):
     return (path.parent/(path.stem + suffix)).with_suffix(path.suffix)
 
 
-def datetime_to_pdf(timestamp):
+def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     """Converts a timestamp to the format used by PDFtk in its `update_info`
     command.  For example, the timestamp 2017-09-01 14:23:45 CEDT is converted
     to ``D:20170901142345+02'00'``.
 
     :param datetime.datetime timestamp: the timestamp
+    :param str timestamp_accuracy: Determines the significant parts of the
+      timestamp.  Only those are output.  Possible values are ``"year"``,
+      ``"month"``, ``"day"``, and ``"full"``.  For example, , ``"month"`` means
+      the output may be ``"D:201709"``.
     :returns: the timestamp in PDF metedata format
     :rtype: str
     """
-    timestamp = timestamp.strftime("D:%Y%m%d%H%M%S%z")
-    return "{}'{}'".format(timestamp[:-2], timestamp[-2:])
+    if timestamp_accuracy == "year":
+        timestamp = timestamp.strftime("D:%Y")
+    elif timestamp_accuracy == "month":
+        timestamp = timestamp.strftime("D:%Y%m")
+    elif timestamp_accuracy == "day":
+        timestamp = timestamp.strftime("D:%Y%m%d")
+    elif timestamp_accuracy == "full":
+        timestamp = timestamp.strftime("D:%Y%m%d%H%M%S%z")
+        timestamp = "{}'{}'".format(timestamp[:-2], timestamp[-2:])
+    return timestamp
 
 
 def silent():
@@ -424,10 +452,11 @@ def prune_profiles():
     """Removes profiles that are older than 5 o'clock of today, and at least 4
     hours old.
     """
-    now = datetime.datetime.now()
-    minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
-    minutes = max(minutes, 4 * 60)
-    silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
+    if profiles_root.exists():
+        now = datetime.datetime.now()
+        minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
+        minutes = max(minutes, 4 * 60)
+        silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
 prune_profiles()
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
@@ -468,7 +497,13 @@ def get_correction_data():
         if configuration_name in configuration:
             for name, make_and_model in configuration[configuration_name].items():
                 print("{0}: {1[0]}, {1[1]}".format(name, make_and_model))
-            setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
+            while True:
+                try:
+                    setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
+                except KeyError:
+                    print("Invalid input.")
+                else:
+                    break
         else:
             make = input(correction_attribute_name + " make? ")
             model = input(correction_attribute_name + " model? ")
@@ -581,16 +616,16 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
         filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
     tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
-    if mode == "color" and "icc_profile" in configuration:
-        silent_call(["cctiff", configuration["icc_profile"], filepath_tiff, tempfile_tiff])
+    if mode == "color" and icc_path:
+        silent_call(["cctiff", icc_path, filepath_tiff, tempfile_tiff])
     else:
         os.rename(str(filepath_tiff), str(tempfile_tiff))
     convert_call = ["convert", tempfile_tiff]
     if mode == "color":
-        convert_call.extend(["-set", "colorspace", "Lab", "-colorspace", "RGB", "-linear-stretch", "2%x1%",
+        convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB", "-level", "12.5%,100%",
                              "-depth", "8", "-colorspace", "sRGB"])
     elif mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-gamma", "2.2", "-depth", "8"])
+        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,100%", "-gamma", "2.2", "-depth", "8"])
     elif mode == "gray_linear":
         convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-depth", "8"])
     elif mode == "mono":
@@ -684,7 +719,7 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
             processes.add(tesseract)
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
         if args.mode == "color":
-            compression_options = ["-compress", "JPEG"]
+            compression_options = ["-compress", "JPEG", "-quality", "30%"]
         elif args.mode == "gray":
             compression_options = ["-compress", "JPEG", "-quality", "30%"]
         elif args.mode == "mono":
@@ -751,25 +786,30 @@ InfoBegin
 InfoKey: Creator
 InfoValue: Kamscan
 InfoBegin
-InfoKey: CreationDate
-InfoValue: {}
-InfoBegin
 InfoKey: ModDate
 InfoValue: {}
 InfoBegin
 InfoKey: Title
 InfoValue: {}
-        """.format(datetime_to_pdf(timestamp), datetime_to_pdf(now), title))
+""".format(datetime_to_pdf(now), title))
+            if timestamp_accuracy != "none":
+                info_file.write("""InfoBegin
+InfoKey: CreationDate
+InfoValue: {}
+""".format(datetime_to_pdf(timestamp, timestamp_accuracy)))
         temp_filepath = tempdir/"temp.pdf"
         silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
         shutil.move(str(temp_filepath), str(filepath))
 
 
+start = None
 with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
     for index, path in camera.images(tempdir, wait_for_disconnect=False):
+        if start is None:
+            start = time.time()
         results.add(pool.apply_async(process_image, (path, index, tempdir)))
     print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
     pool.close()
@@ -780,5 +820,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     pdfs.sort()
     silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
     embed_pdf_metadata(args.filepath)
+if args.debug:
+    print("Time elapsed in seconds:", time.time() - start)
 
 silent_call(["evince", args.filepath])
