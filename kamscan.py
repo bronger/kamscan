@@ -19,6 +19,9 @@ except FileNotFoundError:
     configuration = {}
 
 
+formats = {"A4": (21, 29.7), "A5": (14.8, 21), "A6": (10.5, 14.8), "A7": (7.4, 10.5)}
+
+
 data_root = Path(configuration["data_path"]) if "data_path" in configuration else Path.home()/".config/kamscan"
 profiles_root = data_root/"profiles"
 
@@ -29,6 +32,7 @@ parser.add_argument("--mode", default="mono", choices={"gray", "color", "mono"},
 parser.add_argument("--full-height", type=float, help="height of full page in cm; defaults to 29.7")
 parser.add_argument("--height", type=float, help="height of to-be-scanned area in cm; defaults to full page height")
 parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
+parser.add_argument("--format", choices=set(formats), help="format of the page; defaults to full page height")
 parser.add_argument("--profile", default="default", help="name of profile to use")
 parser.add_argument("--debug", action="store_true", help="debug mode; in particular, don't suppress output of subprocesses")
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
@@ -48,6 +52,12 @@ elif args.calibration:
     page_height = args.full_height
 else:
     raise Exception("You can give --full-height only with --calibration.")
+
+if args.format:
+    assert args.width is None and args.height is None
+    width_in_cm, height_in_cm = formats[args.format]
+else:
+    width_in_cm, height_in_cm = args.width, args.height
 
 match = re.match(r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<title>.*)$", args.filepath.stem)
 if match:
@@ -566,11 +576,11 @@ def raw_to_corrected_pnm(filepath):
 
 
 def calculate_pixel_dimensions(width, height):
-    """Returns the pixel width and height of the page rectangle, and the DPI.
-    This is the page rectangle rather than the calibration rectangle, i.e. the
-    ``--width`` and ``--height`` parameters (or their default values) are
-    used.  The returned dimensions denote the area that needs to be cropped out
-    of the original image.
+    """Returns the pixel width and height of the page rectangle, and the DPI.  This
+    is the page rectangle rather than the calibration rectangle, i.e. the
+    ``--width`` and ``--height`` parameters (or the ``--format`` parameter, or
+    the full page size as default) are used.  The returned dimensions denote
+    the area that needs to be cropped out of the original image.
 
     :param float width: width of the calibration rectangle in pixels
     :param float height: height of the calibration rectangle in pixels
@@ -580,15 +590,15 @@ def calculate_pixel_dimensions(width, height):
     """
     density = correction_data.density(height)
     if args.two_side:
-        if args.height is not None:
-            width = args.height / 2.54 * density
-        if args.width is not None:
-            height = args.width / 2.54 * density
+        if height_in_cm is not None:
+            width = height_in_cm / 2.54 * density
+        if width_in_cm is not None:
+            height = width_in_cm / 2.54 * density
     else:
-        if args.height is not None:
-            height = args.height / 2.54 * density
-        if args.width is not None:
-            width = args.width / 2.54 * density
+        if height_in_cm is not None:
+            height = height_in_cm / 2.54 * density
+        if width_in_cm is not None:
+            width = width_in_cm / 2.54 * density
     return width, height, density
 
 
