@@ -665,19 +665,21 @@ def split_two_side(page_index, filepath_tiff, width, height):
       resulting list either has one or two items.
     :rtype: list[pathlib.Path]
     """
-    if page_index != 0:
+    process_left = page_index != 0
+    process_right = page_index != -1
+    if process_left:
         filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
         left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
                             "-rotate", "-90", filepath_left_tiff], asynchronous=True)
-    if page_index != -1:
+    if process_right:
         filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
         silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), "+repage", filepath_tiff,
                      "-rotate", "-90", filepath_right_tiff])
     tiff_filepaths = []
-    if page_index != 0:
+    if process_left:
         assert left.wait() == 0
         tiff_filepaths.append(filepath_left_tiff)
-    if page_index != -1:
+    if process_right:
         tiff_filepaths.append(filepath_right_tiff)
     return tiff_filepaths
 
