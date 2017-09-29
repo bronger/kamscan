@@ -260,9 +260,8 @@ class Camera:
           camera baing unplugged
 
         :returns: iterator over the image files; each item is a tuple which
-          consists of the page index (starting at zero) and the path to the
-          image file; note that the last image is marked by having a page index
-          of -1.
+          consists of the page index (starting at zero), the number of pages,
+          and the path to the image file
         :rtype: iterator[tuple[int, pathlib.Path]]
         """
         print("Please take pictures.  Then:")
@@ -276,10 +275,10 @@ class Camera:
                 paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
             paths_with_timestamps.sort()
             path_tuples = set()
-            page_index = 0
+            page_count = 0
             for __, path in paths_with_timestamps:
-                path_tuples.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(page_index), page_index))
-                page_index += 1
+                path_tuples.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(page_count), page_count))
+                page_count += 1
             rsync = silent_call(["rsync"] + [path[0] for path in path_tuples] + [tempdir], asynchronous=True)
             while path_tuples:
                 for path_tuple in path_tuples:
@@ -288,9 +287,7 @@ class Camera:
                         os.rename(str(intermediate_path), str(destination))
                         os.remove(str(old_path))
                         path_tuples.remove(path_tuple)
-                        if not path_tuples and page_index != 0:
-                            page_index = -1
-                        yield page_index, destination
+                        yield page_index, page_count, destination
                         break
             assert rsync.wait() == 0
 
@@ -424,18 +421,18 @@ def analyze_calibration_image():
         return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
-        index = None
-        for index, path in camera.images(tempdir):
+        count = 0
+        for index, count, path in camera.images(tempdir):
+            if count > 2:
+                raise Exception("More than two calibration images found.")
             if index == 0:
                 path_color, dcraw_color = call_dcraw(path, extra_raw=True, asynchronous=True)
                 path_gray, dcraw_gray = call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
-            elif index == -1:
-                points = get_points(path)
             else:
-                raise Exception("More than two calibration images found.")
-        if index is None:
-                raise Exception("No calibration image found.")
-        elif index == 0:
+                points = get_points(path)
+        if count == 0:
+            raise Exception("No calibration image found.")
+        elif count == 1:
             points = get_points(path)
         assert dcraw_color.wait() == 0
         assert dcraw_gray.wait() == 0
@@ -646,15 +643,15 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
     return filepath_tiff
 
 
-def split_two_side(page_index, filepath_tiff, width, height):
+def split_two_side(page_index, page_count, filepath_tiff, width, height):
     """Crops the two pages out of the double-page scan.  Note that “width” is the
     height of the double page page (and thus also of the single page), and
     “height” is the width of the double page.
 
     :param int page_index: Index of the current page.  In two-side mode, this
       is the index of the current double page because separation of left and
-      right happens in this function.  Moreover, the last page has the index
-      -1.
+      right happens in this function.
+    :param int page_count: number of (double) pages
     :param pathlib.Path filepath_tiff: path to a TIFF with the scan area (i.e.,
       the double page)
     :param float width: pixel width of the crop area
@@ -665,8 +662,8 @@ def split_two_side(page_index, filepath_tiff, width, height):
       resulting list either has one or two items.
     :rtype: list[pathlib.Path]
     """
-    process_left = page_index != 0
-    process_right = page_index != -1
+    process_left = page_index != 0 or page_count < 3
+    process_right = page_index != page_count - 1 or page_count < 3
     if process_left:
         filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
         left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
@@ -745,14 +742,14 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     return result
 
 
-def process_image(filepath, page_index, output_path):
+def process_image(filepath, page_index, page_count, output_path):
     """Converts one raw image to a searchable single-page PDF.
 
     :param pathlib.Path filepath: path to the raw image file
     :param int page_index: Index of the current page.  In two-side mode, this
       is the index of the current double page because separation of left and
-      right happens in this function.  Moreover, the last page has the index
-      -1.
+      right happens in this function.
+    :param int page_count: number of (double) pages
     :param pathlib.Path output_path: directory where the PDFs are written to
 
     :returns: path to the PDF, or the two PDFs in two-side mode
@@ -763,8 +760,8 @@ def process_image(filepath, page_index, output_path):
     filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density, args.mode)
     filepath_ocr_tiff = create_single_tiff(filepath, width, height, x0, y0, density, "gray_linear", "-ocr")
     if args.two_side:
-        tiff_filepaths = split_two_side(page_index, filepath_tiff, width, height)
-        ocr_tiff_filepaths = split_two_side(page_index, filepath_ocr_tiff, width, height)
+        tiff_filepaths = split_two_side(page_index, page_count, filepath_tiff, width, height)
+        ocr_tiff_filepaths = split_two_side(page_index, page_count, filepath_ocr_tiff, width, height)
     else:
         tiff_filepaths = [filepath_tiff]
         ocr_tiff_filepaths = [filepath_ocr_tiff]
@@ -819,10 +816,10 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    for index, path in camera.images(tempdir, wait_for_disconnect=False):
+    for index, count, path in camera.images(tempdir, wait_for_disconnect=False):
         if start is None:
             start = time.time()
-        results.add(pool.apply_async(process_image, (path, index, tempdir)))
+        results.add(pool.apply_async(process_image, (path, index, count, tempdir)))
     print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
     pool.close()
     pool.join()
