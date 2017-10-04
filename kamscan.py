@@ -599,10 +599,9 @@ def calculate_pixel_dimensions(width, height):
     return width, height, density
 
 
-def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=None):
+def create_crop(filepath, width, height, x0, y0):
     """Crops the scan area out of the out-of-camera PNM file and saves it as a TIFF
-    file.  Moreover, it applies some colour optimisation, and puts the proper
-    DPI value in the output's metadata.
+    file.
 
     :param pathlib.Path filepath: path to the corrected PNM file; it is the
       result of `raw_to_corrected_pnm`
@@ -610,6 +609,20 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
     :param float height: pixel height of the crop area
     :param float x0: x pixel coordinate of the top left corner of the crop area
     :param float y0: y pixel coordinate of the top left corner of the crop area
+    :returns: path to the result image
+    :rtype: pathlib.Path
+    """
+    filepath_tiff = filepath.with_suffix(".tiff")
+    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
+    return filepath_tiff
+
+
+def color_process_single_tiff(filepath, density, mode, suffix):
+    """Applies some colour optimisation and puts the proper DPI value in the
+    output's metadata.
+
+    :param pathlib.Path filepath: path to the cropped TIFF file; it is the
+      result of `create_crop`
     :param float density: DPI of the image
     :param str mode: colour mode; may be the values of the ``--mode`` option
       plus ``gray_linear``, which is used for an OCR-optimised crop
@@ -618,15 +631,12 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
     :returns: path to the result image
     :rtype: pathlib.Path
     """
-    filepath_tiff = filepath.with_suffix(".tiff")
-    if suffix:
-        filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
-    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
-    tempfile_tiff = append_to_path_stem(filepath_tiff, "-temp")
+    tempfile_tiff = append_to_path_stem(filepath, "-temp")
     if mode == "color" and icc_path:
-        silent_call(["cctiff", icc_path, filepath_tiff, tempfile_tiff])
+        silent_call(["cctiff", icc_path, filepath, tempfile_tiff])
     else:
-        os.rename(str(filepath_tiff), str(tempfile_tiff))
+        shutil.copy(str(filepath), str(tempfile_tiff))
+    filepath = append_to_path_stem(filepath, suffix)
     convert_call = ["convert", tempfile_tiff]
     if mode == "color":
         convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB", "-level", "12.5%,100%",
@@ -638,9 +648,9 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
     elif mode == "mono":
         convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-level", "10%,75%",
                              "-dither", "None", "-monochrome", "-depth", "1"])
-    convert_call.extend(["-density", density, filepath_tiff])
+    convert_call.extend(["-density", density, filepath])
     silent_call(convert_call)
-    return filepath_tiff
+    return filepath
 
 
 def split_two_side(page_index, page_count, filepath_tiff, width, height):
@@ -766,16 +776,17 @@ def process_image(filepath, page_index, page_count, output_path):
     """
     filepath, x0, y0, width, height = raw_to_corrected_pnm(filepath)
     width, height, density = calculate_pixel_dimensions(width, height)
-    filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density, args.mode)
+    filepath_tiff = create_crop(filepath, width, height, x0, y0)
+    filepath_image_tiff = color_process_single_tiff(filepath_tiff, density, args.mode, "-image")
     if args.no_ocr:
         filepath_ocr_tiff = None
     else:
-        filepath_ocr_tiff = create_single_tiff(filepath, width, height, x0, y0, density, "gray_linear", "-ocr")
+        filepath_ocr_tiff = color_process_single_tiff(filepath_tiff, density, "gray_linear", "-ocr")
     if args.two_side:
-        tiff_filepaths = split_two_side(page_index, page_count, filepath_tiff, width, height)
+        tiff_filepaths = split_two_side(page_index, page_count, filepath_image_tiff, width, height)
         ocr_tiff_filepaths = split_two_side(page_index, page_count, filepath_ocr_tiff, width, height)
     else:
-        tiff_filepaths = [filepath_tiff]
+        tiff_filepaths = [filepath_image_tiff]
         ocr_tiff_filepaths = [filepath_ocr_tiff]
     result = set()
     for textonly_pdf_filepath, pdf_image_path, pdf_filepath in \
