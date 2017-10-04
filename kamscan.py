@@ -652,32 +652,40 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
       is the index of the current double page because separation of left and
       right happens in this function.
     :param int page_count: number of (double) pages
-    :param pathlib.Path filepath_tiff: path to a TIFF with the scan area (i.e.,
-      the double page)
+    :param filepath_tiff: path to a TIFF with the scan area (i.e., the double
+      page)
+    :type filepath_tiff: pathlib.Path or NoneType
     :param float width: pixel width of the crop area
     :param float height: pixel height of the crop area
     :returns: Paths to the two page images, left and right (in this ordering);
       if it is the first double page, only the right half is returned.  If it
       is the last double page, only the left half is returned.  Thus, the
-      resulting list either has one or two items.
-    :rtype: list[pathlib.Path]
+      resulting list either has one or two items.  The list consists of
+      ``None``s if `filepath_tiff` was ``None``.
+    :rtype: list[pathlib.Path] or list[NoneType]
     """
     process_left = page_index != 0 or page_count < 3
     process_right = page_index != page_count - 1 or page_count < 3
-    if process_left:
-        filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
-        left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
-                            "-rotate", "-90", filepath_left_tiff], asynchronous=True)
-    if process_right:
-        filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
-        silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), "+repage", filepath_tiff,
-                     "-rotate", "-90", filepath_right_tiff])
     tiff_filepaths = []
-    if process_left:
-        assert left.wait() == 0
-        tiff_filepaths.append(filepath_left_tiff)
-    if process_right:
-        tiff_filepaths.append(filepath_right_tiff)
+    if filepath_tiff:
+        if process_left:
+            filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
+            left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
+                                "-rotate", "-90", filepath_left_tiff], asynchronous=True)
+        if process_right:
+            filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
+            silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), "+repage", filepath_tiff,
+                         "-rotate", "-90", filepath_right_tiff])
+        if process_left:
+            assert left.wait() == 0
+            tiff_filepaths.append(filepath_left_tiff)
+        if process_right:
+            tiff_filepaths.append(filepath_right_tiff)
+    else:
+        if process_left:
+            tiff_filepaths.append(None)
+        if process_right:
+            tiff_filepaths.append(None)
     return tiff_filepaths
 
 
@@ -705,27 +713,28 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
 
     :param tiff_filepaths: paths to the TIFFs that should form the final PDF
     :param ocr_tiff_filepaths: paths to the TIFFs that are used for OCR (and
-      discarded afterwards)
+      discarded afterwards); may be a list of ``None``s if no OCR is done
     :param pathlib.Path output_path: directory where the PDFs are written to
     :type tiff_filepaths: list[pathlib.Path]
-    :type ocr_filepaths: list[pathlib.Path]
+    :type ocr_filepaths: list[pathlib.Path] or list[NoneType]
     :returns: Tuples which contain for each input item the path to the
-      text-only TIFF (the result of the OCR), the path to the PDF with the
-      scan, and the output path for the merged PDF.
-    :rtype: set[tuple[pathlib.Path, pathlib.Path, pathlib.Path]]
+      text-only TIFF (the result of the OCR, may be ``None`` if no OCR is
+      done), the path to the PDF with the scan, and the output path for the
+      merged PDF.
+    :rtype: set[tuple[pathlib.Path or NoneType, pathlib.Path, pathlib.Path]]
     """
     processes = set()
     result = set()
     for path, ocr_path in zip(tiff_filepaths, ocr_tiff_filepaths):
         pdf_filepath = output_path/path.with_suffix(".pdf").name
-        if args.no_ocr:
-            textonly_pdf_filepath = None
-        else:
+        if ocr_path:
             textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
             textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
             tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1",
                                      "-l", args.language, "pdf"], asynchronous=True)
             processes.add(tesseract)
+        else:
+            textonly_pdf_filepath = None
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
         if args.mode == "color":
             compression_options = ["-compress", "JPEG", "-quality", "30%"]
@@ -758,7 +767,10 @@ def process_image(filepath, page_index, page_count, output_path):
     filepath, x0, y0, width, height = raw_to_corrected_pnm(filepath)
     width, height, density = calculate_pixel_dimensions(width, height)
     filepath_tiff = create_single_tiff(filepath, width, height, x0, y0, density, args.mode)
-    filepath_ocr_tiff = create_single_tiff(filepath, width, height, x0, y0, density, "gray_linear", "-ocr")
+    if args.no_ocr:
+        filepath_ocr_tiff = None
+    else:
+        filepath_ocr_tiff = create_single_tiff(filepath, width, height, x0, y0, density, "gray_linear", "-ocr")
     if args.two_side:
         tiff_filepaths = split_two_side(page_index, page_count, filepath_tiff, width, height)
         ocr_tiff_filepaths = split_two_side(page_index, page_count, filepath_ocr_tiff, width, height)
