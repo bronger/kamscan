@@ -622,7 +622,7 @@ def create_single_tiff(filepath, width, height, x0, y0, density, mode, suffix=No
     if suffix:
         filepath_tiff = append_to_path_stem(filepath_tiff, suffix)
     silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
-    tempfile_tiff = (filepath_tiff.parent/(filepath_tiff.stem + "-temp")).with_suffix(filepath_tiff.suffix)
+    tempfile_tiff = append_to_path_stem(filepath_tiff, "-temp")
     if mode == "color" and icc_path:
         silent_call(["cctiff", icc_path, filepath_tiff, tempfile_tiff])
     else:
