@@ -6,7 +6,7 @@ This script must reside in the same directory as its helpers ``undistort`` and
 ``analyze_scan.py``.  It requires Python 3.5.
 """
 
-import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re
+import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re, functools
 from contextlib import contextmanager
 from pathlib import Path
 import pytz, yaml
@@ -599,6 +599,41 @@ def calculate_pixel_dimensions(width, height):
     return width, height, density
 
 
+@functools.lru_cache(maxsize=2)
+def get_levels(path):
+    """Returns the black and white levels for this image.  This corresponds to
+    Imagemagick convert's command ``-linear-stretch 2%x1%``.  The result could
+    be passed to ``-level``.  The reason why this is necessary is that pages
+    with very little text confuse ``-linear-stretch``.  It blacks out too much
+    of the page, resulting is way too high contrast.  In contrast, this
+    function caps the black result to 0.15.
+
+    :param pathlib.Path path: path to the image file
+
+    :returns: the black and white level, as fraction of 1
+    :rtype: float, float
+    """
+    line_regex = re.compile(r"(?P<frequency>\d+): \(\s*\d+,\s*\d+,\s*\d+\) #[A-F0-9]{6} gray\((?P<value>\d+)\)$")
+    frequencies = 256 * [0]
+    for line in silent_call(["convert", path, "-colorspace", "gray", "-depth", "8", "-format", "%c", "histogram:info:-"],
+                            swallow_stdout=False).stdout.splitlines():
+        match = line_regex.match(line.strip())
+        value, frequency = int(match.group("value")), int(match.group("frequency"))
+        frequencies[value] += frequency
+    number_of_samples = sum(frequencies)
+    darkest_2_percent = 0
+    for i, frequency in enumerate(frequencies):
+        darkest_2_percent += frequency
+        if darkest_2_percent > number_of_samples * 0.02:
+            break
+    brightest_1_percent = 0
+    for j, frequency in enumerate(reversed(frequencies)):
+        brightest_1_percent += frequency
+        if brightest_1_percent > number_of_samples * 0.01:
+            break
+    return min(i / 255, 0.15), 1 - j / 255
+
+
 def create_crop(filepath, width, height, x0, y0):
     """Crops the scan area out of the out-of-camera PNM file and saves it as a TIFF
     file.
@@ -644,9 +679,13 @@ def color_process_single_tiff(filepath, density, mode, suffix):
     elif mode == "gray":
         convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,100%", "-gamma", "2.2", "-depth", "8"])
     elif mode == "gray_linear":
-        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-depth", "8"])
+        black, white = get_levels(tempfile_tiff)
+        convert_call.extend(["-set", "colorspace", "gray", "-level", "{}%,{}%".format(black * 100, white * 100),
+                             "-depth", "8"])
     elif mode == "mono":
-        convert_call.extend(["-set", "colorspace", "gray", "-linear-stretch", "2%x1%", "-level", "10%,75%",
+        black, white = get_levels(tempfile_tiff)
+        convert_call.extend(["-set", "colorspace", "gray", "-level", "{}%,{}%".format((1 - (1 - 0.1) * (1 - black)) * 100,
+                                                                                      0.75 * white * 100),
                              "-dither", "None", "-monochrome", "-depth", "1"])
     convert_call.extend(["-density", density, filepath])
     silent_call(convert_call)
