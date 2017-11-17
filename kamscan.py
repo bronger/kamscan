@@ -89,6 +89,7 @@ def path_to_own_file(name):
     script.
 
     :param str name: name of the file
+
     :returns: full path to the file
     :rtype: Path
     """
@@ -108,6 +109,7 @@ def append_to_path_stem(path, suffix):
 
     :param pathlib.Path path: original path
     :param str suffix: suffix to be appended
+
     :returns: path with the suffix appended
     :rtype: pathlib.Path
     """
@@ -124,6 +126,7 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
       timestamp.  Only those are output.  Possible values are ``"year"``,
       ``"month"``, ``"day"``, and ``"full"``.  For example, , ``"month"`` means
       the output may be ``"D:201709"``.
+
     :returns: the timestamp in PDF metedata format
     :rtype: str
     """
@@ -558,6 +561,7 @@ def raw_to_corrected_pnm(filepath):
     properly to the the desired page.
 
     :param pathlib.Path filepath: path to the RAW file
+
     :returns: path to the PNM file, coordinates of the full page's origin, and
       its width and height; all in pixels from the top left
     :rtype: pathlib.Path, float, float, float, float
@@ -581,6 +585,7 @@ def calculate_pixel_dimensions(width, height):
 
     :param float width: width of the calibration rectangle in pixels
     :param float height: height of the calibration rectangle in pixels
+
     :returns: width and height of the image crop in pixels, image density in
       DPI
     :rtype: float, float, float
@@ -644,6 +649,7 @@ def create_crop(filepath, width, height, x0, y0):
     :param float height: pixel height of the crop area
     :param float x0: x pixel coordinate of the top left corner of the crop area
     :param float y0: y pixel coordinate of the top left corner of the crop area
+
     :returns: path to the result image
     :rtype: pathlib.Path
     """
@@ -663,6 +669,7 @@ def color_process_single_tiff(filepath, density, mode, suffix):
       plus ``gray_linear``, which is used for an OCR-optimised crop
     :param str suffix: suffix to be appended to the stem to the resulting file
       name; *not* a file extension
+
     :returns: path to the result image
     :rtype: pathlib.Path
     """
@@ -706,6 +713,7 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
     :type filepath_tiff: pathlib.Path or NoneType
     :param float width: pixel width of the crop area
     :param float height: pixel height of the crop area
+
     :returns: Paths to the two page images, left and right (in this ordering);
       if it is the first double page, only the right half is returned.  If it
       is the last double page, only the left half is returned.  Thus, the
@@ -766,6 +774,7 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     :param pathlib.Path output_path: directory where the PDFs are written to
     :type tiff_filepaths: list[pathlib.Path]
     :type ocr_filepaths: list[pathlib.Path] or list[NoneType]
+
     :returns: Tuples which contain for each input item the path to the
       text-only TIFF (the result of the OCR, may be ``None`` if no OCR is
       done), the path to the PDF with the scan, and the output path for the
