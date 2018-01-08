@@ -53,6 +53,8 @@ elif args.calibration:
 else:
     raise Exception("You can give --full-height only with --calibration.")
 
+assert args.filepath.parent.is_dir()
+
 if args.format:
     assert args.width is None and args.height is None
     if args.two_side:
