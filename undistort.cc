@@ -248,14 +248,12 @@ static PyObject *undistort(PyObject *self, PyObject *args) {
 
     const lfLens *lens;
     const lfLens **lenses = ldb.FindLenses(camera, lens_make, lens_model);
-    if (lenses && !lenses[1]) {
+    if (lenses) {
         lens = lenses[0];
-    } else if (!lenses) {
-        PyErr_SetString(PyExc_RuntimeError, "Cannot find lens in database");
-        lf_free(lenses);
-        return NULL;
+        if (lenses[1])
+            PyErr_WarnEx(NULL, "Lens name ambiguous", 1);
     } else {
-        PyErr_SetString(PyExc_RuntimeError, "Lens name ambiguous");
+        PyErr_SetString(PyExc_RuntimeError, "Cannot find lens in database");
         lf_free(lenses);
         return NULL;
     }
