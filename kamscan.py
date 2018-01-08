@@ -55,7 +55,10 @@ else:
 
 if args.format:
     assert args.width is None and args.height is None
-    width_in_cm, height_in_cm = formats[args.format]
+    if args.two_side:
+        height_in_cm, width_in_cm = formats[args.format]
+    else:
+        width_in_cm, height_in_cm = formats[args.format]
 else:
     width_in_cm, height_in_cm = args.width, args.height
 
