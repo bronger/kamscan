@@ -19,7 +19,7 @@ except FileNotFoundError:
     configuration = {}
 
 
-formats = {"A4": (21, 29.7), "A5": (14.8, 21), "A6": (10.5, 14.8), "A7": (7.4, 10.5)}
+formats = {"A2": (42, 59.4), "A3": (29.7, 42), "A4": (21, 29.7), "A5": (14.8, 21), "A6": (10.5, 14.8), "A7": (7.4, 10.5)}
 
 
 data_root = Path(configuration["data_path"]) if "data_path" in configuration else Path.home()/".config/kamscan"
