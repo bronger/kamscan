@@ -759,7 +759,7 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     scan.  Here, we generate for a single page, or two pages in two-side mode,
     the input PDFs needed for that.
 
-    This means that the inpurt lists either have one or two items.  In the
+    This means that the input lists either have one or two items.  In the
     latter case, the ordering is left page, right page.  (As a side note, even
     in two-side mode there may be only one item, namely for the first and the
     last double page.)
