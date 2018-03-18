@@ -33,6 +33,8 @@ parser.add_argument("--full-height", type=float, help="height of full page in cm
 parser.add_argument("--height", type=float, help="height of to-be-scanned area in cm; defaults to full page height")
 parser.add_argument("--width", type=float, help="width of to-be-scanned area in cm; defaults to full page width")
 parser.add_argument("--format", choices=set(formats), help="format of the page; defaults to full page height")
+parser.add_argument("--quality", type=int, default=30,
+                    help="JPEG quality for grayscale and color output in percent; defaults to 30")
 parser.add_argument("--profile", default="default", help="name of profile to use")
 parser.add_argument("--debug", action="store_true", help="debug mode; in particular, don't suppress output of subprocesses")
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
@@ -800,9 +802,9 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
             textonly_pdf_filepath = None
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
         if args.mode == "color":
-            compression_options = ["-compress", "JPEG", "-quality", "30%"]
+            compression_options = ["-compress", "JPEG", "-quality", "{}%".format(args.quality)]
         elif args.mode == "gray":
-            compression_options = ["-compress", "JPEG", "-quality", "30%"]
+            compression_options = ["-compress", "JPEG", "-quality", "{}%".format(args.quality)]
         elif args.mode == "mono":
             compression_options = ["-compress", "Group4"]
         else:
