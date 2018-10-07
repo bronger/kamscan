@@ -149,17 +149,6 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     return timestamp
 
 
-def silent():
-    """Used in subprocess calls to redirect stdout or stderr to ``/dev/null``,
-    as in::
-
-        subprocess.check_call([...], stderr=silent())
-
-    It obeys the ``--debug`` option, i.e. if ``--debug`` is set, no redirection
-    takes place.
-    """
-    return open(os.devnull, "w") if not args.debug else None
-
 def silent_call(arguments, asynchronous=False, swallow_stdout=True):
     """Calls an external program.  stdout and stderr are swallowed by default.  The
     environment variable ``OMP_THREAD_LIMIT`` is set to one, because we do
@@ -182,8 +171,8 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
     """
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
-    kwargs = {"stdout": silent() if swallow_stdout else subprocess.PIPE, "stderr": silent(), "universal_newlines": True,
-              "env": environment}
+    kwargs = {"stdout": subprocess.DEVNULL if swallow_stdout else subprocess.PIPE, "stderr": subprocess.DEVNULL,
+              "universal_newlines": True, "env": environment}
     arguments = list(map(str, arguments))
     if asynchronous:
         return subprocess.Popen(arguments, **kwargs)
