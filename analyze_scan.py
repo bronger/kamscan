@@ -16,12 +16,13 @@ The command-line parameters are:
 The image can be any file format that ImageMagick can handle.
 """
 
-import subprocess, json, sys, os
+import subprocess, json, sys, os, contextlib
 os.environ["KIVY_NO_FILELOG"] = "1"
 os.environ["KIVY_NO_CONSOLELOG"] = "1"
 os.environ["KIVY_NO_CONFIG"] = "1"
-from kivy.app import App
-from kivy.uix.image import Image
+with contextlib.redirect_stdout(None):
+    from kivy.app import App
+    from kivy.uix.image import Image
 
 
 class Result(Exception):
