@@ -40,6 +40,7 @@ parser.add_argument("--debug", action="store_true", help="debug mode; in particu
 parser.add_argument("--language", default="deu", help="three-character language code; defaults to \"deu\"")
 parser.add_argument("--two-side", action="store_true", help="whether two-side images should be assumed; this swaps the "
                     "meanings of --height and --width, with --width being the width of a double page")
+parser.add_argument("--full-histogram", action="store_true", help="don’t do any contrast optimisation")
 parser.add_argument("--no-ocr", action="store_true", help="suppress OCR (much faster)")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing; name without extension must match "
                     "YYYY-MM-DD_Title")
@@ -677,19 +678,23 @@ def color_process_single_tiff(filepath, density, mode, suffix):
     filepath = append_to_path_stem(filepath, suffix)
     convert_call = ["convert", tempfile_tiff]
     if mode == "color":
-        convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB", "-level", "12.5%,100%",
-                             "-depth", "8", "-colorspace", "sRGB"])
+        convert_call.extend(["-set", "colorspace", icc_color_space, "-colorspace", "RGB"] +
+                            ([] if args.full_histogram else ["-level", "12.5%,100%"]) +
+                            ["-depth", "8", "-colorspace", "sRGB"])
     elif mode == "gray":
-        convert_call.extend(["-set", "colorspace", "gray", "-level", "10%,100%", "-gamma", "2.2", "-depth", "8"])
+        convert_call.extend(["-set", "colorspace", "gray"] +
+                            ([] if args.full_histogram else ["-level", "10%,100%"]) +
+                            ["-gamma", "2.2", "-depth", "8"])
     elif mode == "gray_linear":
         black, white = get_levels(tempfile_tiff)
         convert_call.extend(["-set", "colorspace", "gray", "-level", "{}%,{}%".format(black * 100, white * 100),
                              "-depth", "8"])
     elif mode == "mono":
         black, white = get_levels(tempfile_tiff)
-        convert_call.extend(["-set", "colorspace", "gray", "-level", "{}%,{}%".format((1 - (1 - 0.1) * (1 - black)) * 100,
-                                                                                      0.75 * white * 100),
-                             "-dither", "None", "-monochrome", "-depth", "1"])
+        convert_call.extend(["-set", "colorspace", "gray"] +
+                            ([] if args.full_histogram else ["-level", "{}%,{}%".format((1 - (1 - 0.1) * (1 - black)) * 100,
+                                                                                        0.75 * white * 100)]) +
+                            ["-dither", "None", "-monochrome", "-depth", "1"])
     convert_call.extend(["-density", density, filepath])
     silent_call(convert_call)
     return filepath
