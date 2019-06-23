@@ -265,16 +265,16 @@ static PyObject *undistort(PyObject *self, PyObject *args) {
         file >> image;
     }
 
-    lfModifier modifier(camera->CropFactor, image.width, image.height, image.pixel_format());
-    lfModifier pc_coord_modifier(camera->CropFactor, image.width, image.height, image.pixel_format(), true);
-    lfModifier back_modifier(camera->CropFactor, image.width, image.height, image.pixel_format(), true);
-    if (!modifier.EnableDistortionCorrection(lens, 50) || !back_modifier.EnableDistortionCorrection(lens, 50) ||
-        !pc_coord_modifier.EnableDistortionCorrection(lens, 50)) {
+    lfModifier modifier(lens, 50, camera->CropFactor, image.width, image.height, image.pixel_format());
+    lfModifier pc_coord_modifier(lens, 50, camera->CropFactor, image.width, image.height, image.pixel_format(), true);
+    lfModifier back_modifier(lens, 50, camera->CropFactor, image.width, image.height, image.pixel_format(), true);
+    if (!modifier.EnableDistortionCorrection() || !back_modifier.EnableDistortionCorrection() ||
+        !pc_coord_modifier.EnableDistortionCorrection()) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to activate undistortion");
         return NULL;
     }
     if (image.channels == 3)
-        if (!modifier.EnableTCACorrection(lens, 50)) {
+        if (!modifier.EnableTCACorrection()) {
             PyErr_SetString(PyExc_RuntimeError, "Failed to activate un-TCA");
             return NULL;
         }
@@ -303,8 +303,8 @@ static PyObject *undistort(PyObject *self, PyObject *args) {
         x_undist.push_back(result[0]);
         y_undist.push_back(result[1]);
     }
-    if (!modifier.EnablePerspectiveCorrection(lens, 50, x_undist.data(), y_undist.data(), 6, 0) ||
-        !back_modifier.EnablePerspectiveCorrection(lens, 50, x_undist.data(), y_undist.data(), 6, 0)) {
+    if (!modifier.EnablePerspectiveCorrection(x_undist.data(), y_undist.data(), 6, 0) ||
+        !back_modifier.EnablePerspectiveCorrection(x_undist.data(), y_undist.data(), 6, 0)) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to activate perspective correction");
         return NULL;
     }
