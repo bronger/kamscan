@@ -14,7 +14,7 @@ import undistort
 
 
 try:
-    configuration = yaml.load(open(str(Path.home()/".config/kamscan/configuration.yaml")))
+    configuration = yaml.safe_load(open(str(Path.home()/".config/kamscan/configuration.yaml")))
 except FileNotFoundError:
     configuration = {}
 
