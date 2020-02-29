@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# PYTHON_ARGCOMPLETE_OK
 
 """Takes pictures with a photo camera and converts them to a PDF document.
 
@@ -9,7 +10,7 @@ This script must reside in the same directory as its helpers ``undistort`` and
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re, functools
 from contextlib import contextmanager
 from pathlib import Path
-import pytz, yaml
+import pytz, yaml, argcomplete
 import undistort
 
 
@@ -44,6 +45,7 @@ parser.add_argument("--full-histogram", action="store_true", help="don’t do an
 parser.add_argument("--no-ocr", action="store_true", help="suppress OCR (much faster)")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing; name without extension must match "
                     "YYYY-MM-DD_Title")
+argcomplete.autocomplete(parser)
 args = parser.parse_args()
 
 assert "/" not in args.profile
