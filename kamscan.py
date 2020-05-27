@@ -799,7 +799,10 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
             textonly_pdf_filepath = None
         pdf_image_path = append_to_path_stem(path.with_suffix(".pdf"), "-image")
         if args.mode in {"color", "gray"}:
-            compression_options = ["-compress", "JPEG", "-quality", "{}%".format(args.quality)]
+            if args.quality < 100:
+                compression_options = ["-compress", "JPEG", "-quality", "{}%".format(args.quality)]
+            else:
+                compression_options = ["-compress", "lzw"]
         elif args.mode == "mono":
             compression_options = ["-compress", "Group4"]
         else:
