@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 """Reads an image and lets the user click on positions of that image.  The
 resulting pixel cooredinates are returned to the calling process on stdout, in

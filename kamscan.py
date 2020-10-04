@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 
 """Takes pictures with a photo camera and converts them to a PDF document.
