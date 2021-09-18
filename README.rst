@@ -26,7 +26,7 @@ You need
 - dcraw
 - Kivy
 - pytz
-- PyYAML
+- ruamel.yaml
 
 
 Installation

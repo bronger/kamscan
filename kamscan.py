@@ -10,12 +10,15 @@ This script must reside in the same directory as its helpers ``undistort`` and
 import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re, functools
 from contextlib import contextmanager
 from pathlib import Path
-import pytz, yaml, argcomplete
+import pytz, argcomplete
+from ruamel.yaml import YAML
 import undistort
 
 
+yaml = YAML()
+
 try:
-    configuration = yaml.safe_load(open(str(Path.home()/".config/kamscan/configuration.yaml")))
+    configuration = yaml.load(Path.home()/".config/kamscan/configuration.yaml")
 except FileNotFoundError:
     configuration = {}
 
