@@ -678,7 +678,7 @@ def color_process_single_tiff(filepath, density, mode, suffix):
     """
     tempfile_tiff = append_to_path_stem(filepath, "-temp")
     if mode == "color" and icc_path:
-        silent_call(["cctiff", icc_path, filepath, tempfile_tiff])
+        silent_call(["cctiff", "-N", icc_path, filepath, tempfile_tiff])
     else:
         shutil.copy(str(filepath), str(tempfile_tiff))
     filepath = append_to_path_stem(filepath, suffix)
