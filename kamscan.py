@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import pytz, argcomplete
 from ruamel.yaml import YAML
+import trio
 import undistort
 
 
@@ -155,7 +156,7 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     return timestamp
 
 
-def silent_call(arguments, asynchronous=False, swallow_stdout=True):
+async def silent_call(arguments, swallow_stdout=True):
     """Calls an external program.  stdout and stderr are swallowed by default.  The
     environment variable ``OMP_THREAD_LIMIT`` is set to one, because we do
     parallelism by ourselves.  In particular, Tesseract scales *very* badly (at
@@ -163,29 +164,22 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
 
     :param list[object] arguments: the arguments for the call.  They are
       converted to ``str`` implicitly.
-    :param bool asynchronous: whether the program should be launched
-      asynchronously
     :param bool swallow_stdout: if ``False``, stdout is caught and can be
       inspected by the caller (as a str rather than a byte string)
 
-    :returns: if asynchronous, it returns a ``Popen`` object, otherwise, it
-      returns a ``CompletedProcess`` object.
-    :rtype: subprocess.Popen or subprocess.CompletedProcess
+    :returns:
+       The completed process.  Note that its stdout stream is a *bytes* stream
+       (this is a limitation of trio).
 
-    :raises subprocess.CalledProcessError: if a synchronously called process
-      returns a non-zero return code
+    :rtype: subprocess.CompletedProcess
     """
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
-    kwargs = {"stdout": subprocess.DEVNULL if swallow_stdout else subprocess.PIPE,
-              "stderr": None if args.debug else subprocess.DEVNULL,
-              "universal_newlines": True, "env": environment}
     arguments = list(map(str, arguments))
-    if asynchronous:
-        return subprocess.Popen(arguments, **kwargs)
-    else:
-        kwargs["check"] = True
-        return subprocess.run(arguments, **kwargs)
+    return await trio.run_process(arguments,
+                                  stdout=subprocess.DEVNULL if swallow_stdout else subprocess.PIPE,
+                                  stderr=None if args.debug else subprocess.DEVNULL,
+                                  env=environment)
 
 
 class Camera:
@@ -253,7 +247,7 @@ class Camera:
                     result.add(filepath)
         return result
 
-    def images(self, tempdir, wait_for_disconnect=True):
+    async def images(self, tempdir, wait_for_disconnect=True):
         """Returns in iterator over the new images on the camera storage.  “New” means
         here that they were added after the last call to this generator, or
         after the instatiation of this `Camera` object.
@@ -276,8 +270,8 @@ class Camera:
             new_paths = paths - self.paths
             paths_with_timestamps = []
             for path in new_paths:
-                output = silent_call(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", path],
-                                     swallow_stdout=False).stdout.strip()
+                output = await silent_call(["exiv2", "-g", "Exif.Photo.DateTimeOriginal", path],
+                                           swallow_stdout=False).stdout.strip()
                 paths_with_timestamps.append((datetime.datetime.strptime(output[-19:], "%Y:%m:%d %H:%M:%S"), path))
             paths_with_timestamps.sort()
             path_tuples = set()
@@ -285,7 +279,7 @@ class Camera:
             for __, path in paths_with_timestamps:
                 path_tuples.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(page_count), page_count))
                 page_count += 1
-            rsync = silent_call(["rsync"] + [path[0] for path in path_tuples] + [tempdir], asynchronous=True)
+            rsync = await silent_call(["rsync"] + [path[0] for path in path_tuples] + [tempdir], asynchronous=True)
             while path_tuples:
                 for path_tuple in path_tuples:
                     old_path, intermediate_path, destination, page_index = path_tuple
@@ -300,7 +294,7 @@ class Camera:
 camera = Camera(configuration)
 
 
-def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
+async def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
     """Calls dcraw to convert a raw image to a PNM file.  In case of `gray` being
     ``False``, it is a PPM file, otherwise, it is a PGM file.  If `extra_raw`
     is ``False``, the colour depth is 8 bit, and various colour space
@@ -328,7 +322,7 @@ def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
         dcraw_call.extend(["-b", b])
     dcraw_call.append(str(path))
     output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
-    dcraw = silent_call(dcraw_call, asynchronous)
+    dcraw = await silent_call(dcraw_call, asynchronous)
     if asynchronous:
         return output_path, dcraw
     else:
@@ -381,7 +375,7 @@ class CorrectionData:
             "Kamera: '{}'  Objektiv: '{}'".format(*(self.coordinates + [self.camera, self.lens]))
 
 
-def analyze_scan(x, y, scaling, filepath, number_of_points):
+async def analyze_scan(x, y, scaling, filepath, number_of_points):
     """Lets the user find the four corners of the calibration rectangle.
 
     :returns: Pixel coordinates of the four corners of the calibration
@@ -390,12 +384,12 @@ def analyze_scan(x, y, scaling, filepath, number_of_points):
     """
     def clamp(x, max_):
         return min(max(x, 0), max_ - 1)
-    output = silent_call([path_to_own_file("analyze_scan.py"), clamp(x, 4000), clamp(y, 6000), scaling,
-                          filepath, number_of_points], swallow_stdout=False).stdout
+    output = await silent_call([path_to_own_file("analyze_scan.py"), clamp(x, 4000), clamp(y, 6000), scaling,
+                                filepath, number_of_points], swallow_stdout=False).stdout
     result = json.loads(output)
     return result
 
-def analyze_calibration_image():
+async def analyze_calibration_image():
     """Takes one or two calibration images from the camera and creates a profile
     from them.  Such a profile consists of three files:
 
@@ -418,13 +412,13 @@ def analyze_calibration_image():
     :raises Exception: if more than two calibration images were found on the
       camera storage, or none
     """
-    def get_points(path):
+    async def get_points(path):
         temp_path = append_to_path_stem(path, "-unraw")
         # For avoiding a race with the flat field PPM generation.
         os.rename(str(path), str(temp_path))
-        ppm_path = call_dcraw(temp_path, extra_raw=False)
-        raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
-        return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
+        ppm_path = await call_dcraw(temp_path, extra_raw=False)
+        raw_points = await analyze_scan(2000, 3000, 0.1, ppm_path, 4)
+        return [await analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
         count = 0
@@ -432,14 +426,14 @@ def analyze_calibration_image():
             if count > 2:
                 raise Exception("More than two calibration images found.")
             if index == 0:
-                path_color, dcraw_color = call_dcraw(path, extra_raw=True, asynchronous=True)
-                path_gray, dcraw_gray = call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
+                path_color, dcraw_color = await call_dcraw(path, extra_raw=True, asynchronous=True)
+                path_gray, dcraw_gray = await call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
             else:
-                points = get_points(path)
+                points = await get_points(path)
         if count == 0:
             raise Exception("No calibration image found.")
         elif count == 1:
-            points = get_points(path)
+            points = await get_points(path)
         assert dcraw_color.wait() == 0
         assert dcraw_gray.wait() == 0
         shutil.move(str(path_color), str(profile_root/"flatfield.ppm"))
@@ -461,7 +455,7 @@ def analyze_calibration_image():
     return correction_data
 
 
-def prune_profiles():
+async def rune_profiles():
     """Removes profiles that are older than 5 o'clock of today, and at least 4
     hours old.
     """
@@ -469,12 +463,12 @@ def prune_profiles():
         now = datetime.datetime.now()
         minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
         minutes = max(minutes, 4 * 60)
-        silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
-prune_profiles()
+        await silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
+trio.run(prune_profiles)
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
 
-def get_correction_data():
+async def get_correction_data():
     """Returns the correction data for the current profile.  If such data does not
     yet exist on disk, the user gets the opportunity to provide the necessary
     input for it (taking calibration images, click on corners).  The result of
@@ -522,7 +516,7 @@ def get_correction_data():
             model = input(correction_attribute_name + " model? ")
             setattr(correction_data, correction_attribute_name, (make, model))
     print("Calibration is necessary.  First the flat field, then for the position, or one image for both …")
-    correction_data = analyze_calibration_image()
+    correction_data = await analyze_calibration_image()
     input_choice("cameras", "camera")
     print()
     input_choice("lenses", "lens")
@@ -530,15 +524,15 @@ def get_correction_data():
     return correction_data
 
 if args.calibration:
-    correction_data = get_correction_data()
+    correction_data = trio.run(get_correction_data)
 else:
     try:
         correction_data = pickle.load(open(str(calibration_file_path), "rb"))
     except FileNotFoundError:
-        correction_data = get_correction_data()
+        correction_data = trio.run(get_correction_data)
 
 
-def raw_to_corrected_pnm(filepath):
+async def raw_to_corrected_pnm(filepath):
     """Converts a RAW file into a corrected PNM file.  The applied corrections are:
 
     1. Vignetting
@@ -569,10 +563,10 @@ def raw_to_corrected_pnm(filepath):
       its width and height; all in pixels from the top left
     :rtype: pathlib.Path, float, float, float, float
     """
-    filepath = call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
+    filepath = await call_dcraw(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = append_to_path_stem(filepath, "-temp")
-    silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
+    await silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
     os.rename(str(tempfile), str(filepath))
     x0, y0, width, height = undistort.undistort(str(filepath), *(correction_data.coordinates +
                                                                  correction_data.camera + correction_data.lens))
@@ -608,7 +602,7 @@ def calculate_pixel_dimensions(width, height):
 
 
 @functools.lru_cache(maxsize=2)
-def get_levels(path):
+async def get_levels(path):
     """Returns the black and white levels for this image.  This corresponds to
     Imagemagick convert's command ``-linear-stretch 2%x1%``.  The result could
     be passed to ``-level``.  The reason why this is necessary is that pages
@@ -623,8 +617,9 @@ def get_levels(path):
     """
     line_regex = re.compile(r"(?P<frequency>\d+): \(\s*\d+,\s*\d+,\s*\d+\) #[A-F0-9]{6} gray\((?P<value>\d+)\)$")
     frequencies = 256 * [0]
-    for line in silent_call(["convert", path, "-colorspace", "gray", "-depth", "8", "-format", "%c", "histogram:info:-"],
-                            swallow_stdout=False).stdout.splitlines():
+    for line in await silent_call(
+            ["convert", path, "-colorspace", "gray", "-depth", "8", "-format", "%c", "histogram:info:-"],
+            swallow_stdout=False).stdout.splitlines():
         match = line_regex.match(line.strip())
         value, frequency = int(match.group("value")), int(match.group("frequency"))
         frequencies[value] += frequency
@@ -657,11 +652,12 @@ def create_crop(filepath, width, height, x0, y0):
     :rtype: pathlib.Path
     """
     filepath_tiff = filepath.with_suffix(".tiff")
-    silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0), "+repage", filepath, filepath_tiff])
+    await silent_call(["convert", "-extract", "{}x{}+{}+{}".format(width, height, x0, y0),
+                       "+repage", filepath, filepath_tiff])
     return filepath_tiff
 
 
-def color_process_single_tiff(filepath, density, mode, suffix):
+async def color_process_single_tiff(filepath, density, mode, suffix):
     """Applies some colour optimisation and puts the proper DPI value in the
     output's metadata.
 
@@ -678,7 +674,7 @@ def color_process_single_tiff(filepath, density, mode, suffix):
     """
     tempfile_tiff = append_to_path_stem(filepath, "-temp")
     if mode == "color" and icc_path:
-        silent_call(["cctiff", "-N", icc_path, filepath, tempfile_tiff])
+        await silent_call(["cctiff", "-N", icc_path, filepath, tempfile_tiff])
     else:
         shutil.copy(str(filepath), str(tempfile_tiff))
     filepath = append_to_path_stem(filepath, suffix)
@@ -692,21 +688,21 @@ def color_process_single_tiff(filepath, density, mode, suffix):
                             ([] if args.full_histogram else ["-level", "10%,100%"]) +
                             ["-gamma", "2.2", "-depth", "8"])
     elif mode == "gray_linear":
-        black, white = get_levels(tempfile_tiff)
+        black, white = await get_levels(tempfile_tiff)
         convert_call.extend(["-set", "colorspace", "gray", "-level", "{}%,{}%".format(black * 100, white * 100),
                              "-depth", "8"])
     elif mode == "mono":
-        black, white = get_levels(tempfile_tiff)
+        black, white = await get_levels(tempfile_tiff)
         convert_call.extend(["-set", "colorspace", "gray"] +
                             ([] if args.full_histogram else ["-level", "{}%,{}%".format((1 - (1 - 0.1) * (1 - black)) * 100,
                                                                                         0.75 * white * 100)]) +
                             ["-dither", "None", "-monochrome", "-depth", "1"])
     convert_call.extend(["-density", density, filepath])
-    silent_call(convert_call)
+    await silent_call(convert_call)
     return filepath
 
 
-def split_two_side(page_index, page_count, filepath_tiff, width, height):
+async def split_two_side(page_index, page_count, filepath_tiff, width, height):
     """Crops the two pages out of the double-page scan.  Note that “width” is the
     height of the double page page (and thus also of the single page), and
     “height” is the width of the double page.
@@ -734,12 +730,12 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
     if filepath_tiff:
         if process_left:
             filepath_left_tiff = append_to_path_stem(filepath_tiff, "-0")
-            left = silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage", filepath_tiff,
-                                "-rotate", "-90", filepath_left_tiff], asynchronous=True)
+            left = await silent_call(["convert", "-extract", "{0}x{1}+0+0".format(width, height / 2), "+repage",
+                                      filepath_tiff, "-rotate", "-90", filepath_left_tiff], asynchronous=True)
         if process_right:
             filepath_right_tiff = append_to_path_stem(filepath_tiff, "-1")
-            silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), "+repage", filepath_tiff,
-                         "-rotate", "-90", filepath_right_tiff])
+            await silent_call(["convert", "-extract", "{0}x{1}+0+{1}".format(width, height / 2), "+repage", filepath_tiff,
+                               "-rotate", "-90", filepath_right_tiff])
         if process_left:
             assert left.wait() == 0
             tiff_filepaths.append(filepath_left_tiff)
@@ -753,7 +749,7 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
     return tiff_filepaths
 
 
-def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
+async def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     """Generates the PDF pairs that are merged to the final pages.  Every page of
     the final PDF consists of two layers: the invisible text layer and the
     scan.  Here, we generate for a single page, or two pages in two-side mode,
@@ -795,8 +791,8 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
         if ocr_path:
             textonly_pdf_filepath = append_to_path_stem(pdf_filepath, "-textonly")
             textonly_pdf_pathstem = textonly_pdf_filepath.parent/textonly_pdf_filepath.stem
-            tesseract = silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1",
-                                     "-l", args.language, "pdf"], asynchronous=True)
+            tesseract = await silent_call(["tesseract", ocr_path, textonly_pdf_pathstem , "-c", "textonly_pdf=1",
+                                           "-l", args.language, "pdf"], asynchronous=True)
             processes.add(tesseract)
         else:
             textonly_pdf_filepath = None
@@ -810,14 +806,14 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
             compression_options = ["-compress", "Group4"]
         else:
             compression_options = []
-        silent_call(["convert", path] + compression_options + [pdf_image_path])
+        await silent_call(["convert", path] + compression_options + [pdf_image_path])
         result.add((textonly_pdf_filepath, pdf_image_path, pdf_filepath))
     for process in processes:
         assert process.wait() == 0
     return result
 
 
-def process_image(filepath, page_index, page_count, output_path):
+async def process_image(filepath, page_index, page_count, output_path, pdfs):
     """Converts one raw image to a searchable single-page PDF.
 
     :param pathlib.Path filepath: path to the raw image file
@@ -826,36 +822,33 @@ def process_image(filepath, page_index, page_count, output_path):
       right happens in this function.
     :param int page_count: number of (double) pages
     :param pathlib.Path output_path: directory where the PDFs are written to
-
-    :returns: path to the PDF, or the two PDFs in two-side mode
-    :rtype: set[pathlib.Path]
+    :param list[str] pdfs: Paths of all generated PDFs.  This routine appends
+      the newly created PDFs to this.
     """
-    filepath, x0, y0, width, height = raw_to_corrected_pnm(filepath)
+    filepath, x0, y0, width, height = await raw_to_corrected_pnm(filepath)
     width, height, density = calculate_pixel_dimensions(width, height)
     filepath_tiff = create_crop(filepath, width, height, x0, y0)
-    filepath_image_tiff = color_process_single_tiff(filepath_tiff, density, args.mode, "-image")
+    filepath_image_tiff = await color_process_single_tiff(filepath_tiff, density, args.mode, "-image")
     if args.no_ocr:
         filepath_ocr_tiff = None
     else:
-        filepath_ocr_tiff = color_process_single_tiff(filepath_tiff, density, "gray_linear", "-ocr")
+        filepath_ocr_tiff = await color_process_single_tiff(filepath_tiff, density, "gray_linear", "-ocr")
     if args.two_side:
-        tiff_filepaths = split_two_side(page_index, page_count, filepath_image_tiff, width, height)
-        ocr_tiff_filepaths = split_two_side(page_index, page_count, filepath_ocr_tiff, width, height)
+        tiff_filepaths = await split_two_side(page_index, page_count, filepath_image_tiff, width, height)
+        ocr_tiff_filepaths = await split_two_side(page_index, page_count, filepath_ocr_tiff, width, height)
     else:
         tiff_filepaths = [filepath_image_tiff]
         ocr_tiff_filepaths = [filepath_ocr_tiff]
-    result = set()
     for textonly_pdf_filepath, pdf_image_path, pdf_filepath in \
-        single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
+        await single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
         if textonly_pdf_filepath:
-            silent_call(["pdftk", textonly_pdf_filepath, "multibackground", pdf_image_path, "output", pdf_filepath])
+            await silent_call(["pdftk", textonly_pdf_filepath, "multibackground", pdf_image_path, "output", pdf_filepath])
         else:
             shutil.move(str(pdf_image_path), str(pdf_filepath))
-        result.add(pdf_filepath)
-    return result
+        pdfs.append(pdf_filepath)
 
 
-def embed_pdf_metadata(filepath):
+async def embed_pdf_metadata(filepath):
     """Embeds metadata in a PDF.  It sets author, creator, title, and timestamp
     data.  Note that this data is partly taken from the global variables
     `timestamp` and `title`.  The given file is changed in place.
@@ -886,29 +879,27 @@ InfoKey: CreationDate
 InfoValue: {}
 """.format(datetime_to_pdf(timestamp, timestamp_accuracy)))
         temp_filepath = tempdir/"temp.pdf"
-        silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
+        await silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
         shutil.move(str(temp_filepath), str(filepath))
 
 
 start = None
-with tempfile.TemporaryDirectory() as tempdir:
-    tempdir = Path(tempdir)
-    pool = multiprocessing.Pool()
-    results = set()
-    for index, count, path in camera.images(tempdir, wait_for_disconnect=False):
-        if start is None:
-            start = time.time()
-        results.add(pool.apply_async(process_image, (path, index, count, tempdir)))
-    print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
-    pool.close()
-    pool.join()
+async def create_pdf():
     pdfs = []
-    for result in results:
-        pdfs.extend(result.get())
-    pdfs.sort()
-    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
-    embed_pdf_metadata(args.filepath)
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = Path(tempdir)
+        async with trio.open_nursery() as nursery:
+            async for index, count, path in camera.images(tempdir, wait_for_disconnect=False):
+                if start is None:
+                    start = time.time()
+                nursery.start_soon(process_image, path, index, count, tempdir, pdfs)
+            print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
+        pdfs.sort()
+        await silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
+        await embed_pdf_metadata(args.filepath)
+trio.run(create_pdf)
 if args.debug:
     print("Time elapsed in seconds:", time.time() - start)
 
-silent_call(["evince", args.filepath])
+
+trio.run(silent_call, "evince", args.filepath)
