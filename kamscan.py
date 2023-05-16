@@ -208,7 +208,7 @@ class Camera:
         with self._camera_connected():
             self.paths = self._collect_paths()
 
-    def path_exists(self):
+    def _path_exists(self):
         """Returns whether the mount point of the camera exists.
 
         :returns: whether the mount point of the camera exists
@@ -229,14 +229,14 @@ class Camera:
         :param bool wait_for_disconnect: whether to explicitly wait for the
           camera baing unplugged
         """
-        if not self.path_exists():
+        if not self._path_exists():
             print("Please plug-in camera.")
-        while not self.path_exists():
+        while not self._path_exists():
             time.sleep(1)
         yield
         if wait_for_disconnect:
             print("Please unplug camera.")
-            while self.path_exists():
+            while self._path_exists():
                 time.sleep(1)
 
     def _collect_paths(self):
