@@ -13,8 +13,8 @@ from pathlib import Path
 import pytz, argcomplete
 from ruamel.yaml import YAML
 import undistort
-from kamscan import utils
-from kamscan.utils import silent_call
+from . import utils
+from .utils import silent_call
 
 
 yaml = YAML()

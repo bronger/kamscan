@@ -1,6 +1,6 @@
 import time, os, os.path
 from pathlib import Path
-from kamscan.utils import silent_call
+from ..utils import silent_call
 
 
 class Source:
