@@ -22,6 +22,11 @@ class Source:
         :type path: str or NoneType
         """
         self.mount_path = Path(configuration["camera_mount_path"])
+        reuse_dir_prefix = configuration.get("reuse_dir_prefix"])
+        if reuse_dir_prefix:
+            self.reuse_dir = Path(reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
+            os.makedirs(self.reuse_dir)
+            print("Rohdateien werden gespeichert unter:", self.reuse_dir)
         self.path = path
         if not self.path:
             with self._camera_connected():
@@ -113,16 +118,19 @@ class Source:
                 path_tuples.add((path, tempdir/path.name, tempdir/"{:06}.ARW".format(page_count), page_count))
                 page_count += 1
             rsync = silent_call(["rsync"] + [path[0] for path in path_tuples] + [tempdir], asynchronous=True)
+            raw_paths = set()
             while path_tuples:
                 for path_tuple in path_tuples:
                     old_path, intermediate_path, destination, page_index = path_tuple
                     if intermediate_path.exists():
                         os.rename(str(intermediate_path), str(destination))
+                        raw_paths.add(destination)
                         os.remove(str(old_path))
                         path_tuples.remove(path_tuple)
                         yield page_index, page_count, destination
                         break
             assert rsync.wait() == 0
+            silent_call(["cp", "--reflink"] + list(raw_paths) + [self.reuse_dir])
 
     @staticmethod
     def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
