@@ -16,12 +16,12 @@ class Source:
 
         :param dict[str, object] configuration: global configuration, as read
           from ``configuration.yaml``.
-        :param parameters: directory with the ARW files; if None, they are read
-          from the camera
+        :param path: directory with the ARW files; if None, they are read from
+          the camera
 
-        :type parameters: str or NoneType
+        :type path: str or NoneType
         """
-        assert parameters is None
+        assert path is None
         self.mount_path = Path(configuration["camera_mount_path"])
         with self._camera_connected():
             self.paths = self._collect_paths()
