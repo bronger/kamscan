@@ -115,3 +115,40 @@ class Source:
                         yield page_index, page_count, destination
                         break
             assert rsync.wait() == 0
+
+    @staticmethod
+    def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
+        """Calls dcraw to convert a raw image to a PNM file.  In case of `gray`
+        being ``False``, it is a PPM file, otherwise, it is a PGM file.  If
+        `extra_raw` is ``False``, the colour depth is 8 bit, and various colour
+        space transformations of dcraw are applied in order to make the result
+        look nice.
+
+        :param pathlib.Path path: path to the raw image file
+        :param bool extra_raw: whether the result is as raw as possible,
+          i.e. 16 bit, linear, no colour space transformation
+        :param bool gray: wether to produce a greyscale file; if ``False``,
+          demosaicing is applied
+        :param float b: exposure correction; all intensities are multiplied by this
+          value
+        :param bool asynchronous: whether to call dcraw asynchronously
+
+        :returns: output path of the PNM file; if dcraw was called
+          asynchronously, the dcraw ``Popen`` object is returned, too
+        :rtype: pathlib.Path or tuple[pathlib.Path, subprocess.Popen]
+        """
+        dcraw_call = ["dcraw", "-t", 5]
+        if extra_raw:
+            dcraw_call.extend(["-o", 0, "-M", "-6", "-g", 1, 1, "-r", 1, 1, 1, 1, "-W"])
+        if gray:
+            dcraw_call.append("-d")
+        if b is not None:
+            dcraw_call.extend(["-b", b])
+        dcraw_call.append(str(path))
+        output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
+        dcraw = silent_call(dcraw_call, asynchronous)
+        if asynchronous:
+            return output_path, dcraw
+        else:
+            assert output_path.exists()
+            return output_path

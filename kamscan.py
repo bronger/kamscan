@@ -185,42 +185,6 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
 source = importlib.import_module("sources." + source_name).Source(configuration["sources"][source_name], source_parameters)
 
 
-def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
-    """Calls dcraw to convert a raw image to a PNM file.  In case of `gray` being
-    ``False``, it is a PPM file, otherwise, it is a PGM file.  If `extra_raw`
-    is ``False``, the colour depth is 8 bit, and various colour space
-    transformations of dcraw are applied in order to make the result look nice.
-
-    :param pathlib.Path path: path to the raw image file
-    :param bool extra_raw: whether the result is as raw as possible, i.e. 16
-      bit, linear, no colour space transformation
-    :param bool gray: wether to produce a greyscale file; if ``False``,
-      demosaicing is applied
-    :param float b: exposure correction; all intensities are multiplied by this
-      value
-    :param bool asynchronous: whether to call dcraw asynchronously
-
-    :returns: output path of the PNM file; if dcraw was called asynchronously,
-      the dcraw ``Popen`` object is returned, too
-    :rtype: pathlib.Path or tuple[pathlib.Path, subprocess.Popen]
-    """
-    dcraw_call = ["dcraw", "-t", 5]
-    if extra_raw:
-        dcraw_call.extend(["-o", 0, "-M", "-6", "-g", 1, 1, "-r", 1, 1, 1, 1, "-W"])
-    if gray:
-        dcraw_call.append("-d")
-    if b is not None:
-        dcraw_call.extend(["-b", b])
-    dcraw_call.append(str(path))
-    output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
-    dcraw = silent_call(dcraw_call, asynchronous)
-    if asynchronous:
-        return output_path, dcraw
-    else:
-        assert output_path.exists()
-        return output_path
-
-
 class CorrectionData:
     """Class holding data that belongs to an image calibration.  This data is part
     of a profile.  It is stored in the pickle file in the profile's directory.
@@ -307,7 +271,7 @@ def analyze_calibration_image():
         temp_path = append_to_path_stem(path, "-unraw")
         # For avoiding a race with the flat field PPM generation.
         os.rename(str(path), str(temp_path))
-        ppm_path = raw_to_pnm(temp_path, extra_raw=False)
+        ppm_path = source.raw_to_pnm(temp_path, extra_raw=False)
         raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
         return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
@@ -317,8 +281,8 @@ def analyze_calibration_image():
             if count > 2:
                 raise Exception("More than two calibration images found.")
             if index == 0:
-                path_color, dcraw_color = raw_to_pnm(path, extra_raw=True, asynchronous=True)
-                path_gray, dcraw_gray = raw_to_pnm(path, extra_raw=True, gray=True, asynchronous=True)
+                path_color, dcraw_color = source.raw_to_pnm(path, extra_raw=True, asynchronous=True)
+                path_gray, dcraw_gray = source.raw_to_pnm(path, extra_raw=True, gray=True, asynchronous=True)
             else:
                 points = get_points(path)
         if count == 0:
@@ -456,7 +420,7 @@ def raw_to_corrected_pnm(filepath):
       its width and height; all in pixels from the top left
     :rtype: pathlib.Path, float, float, float, float
     """
-    filepath = raw_to_pnm(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
+    filepath = source.raw_to_pnm(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = append_to_path_stem(filepath, "-temp")
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
