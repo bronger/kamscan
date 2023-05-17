@@ -21,10 +21,11 @@ class Source:
 
         :type path: str or NoneType
         """
-        assert path is None
         self.mount_path = Path(configuration["camera_mount_path"])
-        with self._camera_connected():
-            self.paths = self._collect_paths()
+        self.path = path
+        if not self.path:
+            with self._camera_connected():
+                self.paths = self._collect_paths()
 
     def _mount_path_exists(self):
         """Returns whether the mount point of the camera exists.
@@ -88,6 +89,14 @@ class Source:
           and the path to the image file
         :rtype: iterator[tuple[int, pathlib.Path]]
         """
+        if self.path:
+            with os.scandir(self.path) as it:
+                raw_files = [entry.path for entry in it]
+            raw_files.sort()
+            page_count = len(raw_files)
+            for page_index, raw_file in enumerate(raw_files):
+                yield page_index, page_count, raw_file
+            return
         print("Please take pictures.  Then:")
         with self._camera_connected(wait_for_disconnect):
             paths = self._collect_paths()
