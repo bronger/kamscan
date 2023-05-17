@@ -782,7 +782,7 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    for index, count, path in camera.images(tempdir, wait_for_disconnect=False):
+    for index, count, path in source.images(tempdir, wait_for_disconnect=False):
         if start is None:
             start = time.time()
         results.add(pool.apply_async(process_image, (path, index, count, tempdir)))
