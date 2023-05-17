@@ -12,12 +12,15 @@ class Source:
     :type path: pathlib.Path
     """
 
-    def __init__(self, configuration, parameters):
+    def __init__(self, configuration, path):
         """Class constructor.
 
         :param dict[str, object] configuration: global configuration, as read
           from ``configuration.yaml``.
-        :param NoneType parameters: must be ``None``
+        :param parameters: directory with the ARW files; if None, they are read
+          from the camera
+
+        :type parameters: str or NoneType
         """
         assert parameters is None
         self.path = Path(configuration["camera_mount_path"])
