@@ -7,7 +7,7 @@ This script must reside in the same directory as its helpers ``undistort`` and
 ``analyze_scan.py``.  It requires Python 3.5.
 """
 
-import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re, functools
+import argparse, pickle, time, os, tempfile, shutil, subprocess, json, multiprocessing, datetime, re, functools, importlib
 from contextlib import contextmanager
 from pathlib import Path
 import pytz, argcomplete
@@ -50,6 +50,8 @@ parser.add_argument("--full-histogram", action="store_true", help="don’t do an
 parser.add_argument("--no-ocr", action="store_true", help="suppress OCR (much faster)")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing; name without extension must match "
                     "YYYY-MM-DD_Title")
+parser.add_argument("--source", default=configuration["default_source"],
+                    help="Python script name in sources/ directory with the source class")
 argcomplete.autocomplete(parser)
 args = parser.parse_args()
 
@@ -159,7 +161,7 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     return timestamp
 
 
-camera = Source(configuration)
+source = importlib.import_module("sources." + args.source).Source(configuration["sources"][args.source])
 
 
 def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):
@@ -290,7 +292,7 @@ def analyze_calibration_image():
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
         count = 0
-        for index, count, path in camera.images(tempdir):
+        for index, count, path in source.images(tempdir):
             if count > 2:
                 raise Exception("More than two calibration images found.")
             if index == 0:
