@@ -97,11 +97,12 @@ if match:
 else:
     raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
-if "icc_profile" in configuration:
-    icc_path, icc_color_space = configuration["icc_profile"]
-    icc_path = Path(icc_path)
-else:
+try:
+    profile_data = configuration["sources"][args.source]["icc_profile"]
+except KeyError:
     icc_path, icc_color_space = None, "RGB"
+else:
+    icc_path, icc_color_space = Path(profile_data["path"]), profile_data["color_space"]
 
 def path_to_own_file(name):
     """Returns the path to a file which resides in the same directory as this
@@ -355,12 +356,12 @@ def get_correction_data():
 
             cameras:
               "1":
-                - Sony
-                - NEX-7
+                make: Sony
+                model: NEX-7
             lenses:
               "1":
-                - Sony
-                - E 50mm f/1.8 OSS (kamscan)
+                make: Sony
+                model: E 50mm f/1.8 OSS (kamscan)
 
         Then, the user may enter, say, “1” for setting the profile to NEX-7.
         Note that the dictionary keys in the configuration file must be
@@ -373,13 +374,15 @@ def get_correction_data():
         """
         if configuration_name in configuration:
             for name, make_and_model in configuration[configuration_name].items():
-                print("{0}: {1[0]}, {1[1]}".format(name, make_and_model))
+                make, model = make_and_model["make"], make_and_model["model"]
+                print(f"{name}: {make}, {model}")
             while True:
                 try:
-                    setattr(correction_data, correction_attribute_name, configuration[configuration_name][input("? ")])
+                    make_and_model = configuration[configuration_name][input("? ")]
                 except KeyError:
                     print("Invalid input.")
                 else:
+                    setattr(correction_data, correction_attribute_name, (make_and_model["make"], make_and_model["model"]))
                     break
         else:
             make = input(correction_attribute_name + " make? ")
