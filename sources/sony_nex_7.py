@@ -6,10 +6,9 @@ from ..utils import silent_call
 class Source:
     """Class with abstracts the interface to a camera.
 
-    :var path: Path to the directory which contains the image files if the
-      camera's storage is mounted.  All subdirectories are searched for images
-      as well.
-    :type path: pathlib.Path
+    :var pathlib.Path mount_path: Path to the directory which contains the
+      image files if the camera's storage is mounted.  All subdirectories are
+      searched for images as well.
     """
 
     def __init__(self, configuration, path):
@@ -23,11 +22,11 @@ class Source:
         :type parameters: str or NoneType
         """
         assert parameters is None
-        self.path = Path(configuration["camera_mount_path"])
+        self.mount_path = Path(configuration["camera_mount_path"])
         with self._camera_connected():
             self.paths = self._collect_paths()
 
-    def _path_exists(self):
+    def _mount_path_exists(self):
         """Returns whether the mount point of the camera exists.
 
         :returns: whether the mount point of the camera exists
@@ -37,7 +36,7 @@ class Source:
         while cycles_left:
             cycles_left -= 1
             try:
-                return self.path.exists()
+                return self.mount_path.exists()
             except PermissionError as error:
                 time.sleep(1)
 
@@ -48,14 +47,14 @@ class Source:
         :param bool wait_for_disconnect: whether to explicitly wait for the
           camera baing unplugged
         """
-        if not self._path_exists():
+        if not self._mount_path_exists():
             print("Please plug-in camera.")
-        while not self._path_exists():
+        while not self._mount_path_exists():
             time.sleep(1)
         yield
         if wait_for_disconnect:
             print("Please unplug camera.")
-            while self._path_exists():
+            while self._mount_path_exists():
                 time.sleep(1)
 
     def _collect_paths(self):
@@ -65,7 +64,7 @@ class Source:
         :rtype: set[pathlib.Path]
         """
         result = set()
-        for root, __, filenames in os.walk(str(self.path)):
+        for root, __, filenames in os.walk(str(self.mount_path)):
             for filename in filenames:
                 if os.path.splitext(filename)[1] in {".JPG", ".ARW"}:
                     filepath = Path(root)/filename
