@@ -50,12 +50,32 @@ parser.add_argument("--full-histogram", action="store_true", help="don’t do an
 parser.add_argument("--no-ocr", action="store_true", help="suppress OCR (much faster)")
 parser.add_argument("filepath", type=Path, help="path to the PDF file for storing; name without extension must match "
                     "YYYY-MM-DD_Title")
-parser.add_argument("--source", default=configuration["default_source"],
-                    help="Python script name in sources/ directory with the source class")
+parser.add_argument("--source", default=configuration["default_source"], help="name of the images source; may have "
+                    "parameters of the form --source name;val or --source name;par1=val1,par2=val2")
 argcomplete.autocomplete(parser)
 args = parser.parse_args()
 
 utils.debug = args.debug
+
+def parse_source():
+    source_name, sep, parameters_raw = args.source.partition(";")
+    source_name, parameters_raw = source_name.strip(), parameters_raw.strip()
+    if sep:
+        pairs = parameters.raw.split(",")
+        if not pairs:
+            return source_name, None
+        parameters = {}
+        for pair in pairs:
+            pair = pair.strip()
+            key, sep, value = pair.partition("=")
+            if not sep:
+                assert len(pairs) == 1
+                return source_name, pair
+            parameters[key.strip()] = value.strip()
+        return source_name, parameters
+    else:
+        return source_name, None
+source_name, source_parameters = parse_source()
 
 assert "/" not in args.profile
 profile_root = profiles_root/args.profile
@@ -98,7 +118,7 @@ else:
     raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
 try:
-    profile_data = configuration["sources"][args.source]["icc_profile"]
+    profile_data = configuration["sources"][source_name]["icc_profile"]
 except KeyError:
     icc_path, icc_color_space = None, "RGB"
 else:
@@ -162,7 +182,7 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     return timestamp
 
 
-source = importlib.import_module("sources." + args.source).Source(configuration["sources"][args.source])
+source = importlib.import_module("sources." + source_name).Source(configuration["sources"][source_name], source_parameters)
 
 
 def call_dcraw(path, extra_raw, gray=False, b=None, asynchronous=False):

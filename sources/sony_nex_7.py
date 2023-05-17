@@ -12,13 +12,14 @@ class Source:
     :type path: pathlib.Path
     """
 
-    def __init__(self, configuration):
+    def __init__(self, configuration, parameters):
         """Class constructor.
 
-        :param configuration: global configuration, as read from
-          ``configuration.yaml``.
-        :type configuration: dict[str, object]
+        :param dict[str, object] configuration: global configuration, as read
+          from ``configuration.yaml``.
+        :param NoneType parameters: must be ``None``
         """
+        assert parameters is None
         self.path = Path(configuration["camera_mount_path"])
         with self._camera_connected():
             self.paths = self._collect_paths()
