@@ -46,7 +46,7 @@ class Source:
         """Context manager for a mounted camera storage.
 
         :param bool wait_for_disconnect: whether to explicitly wait for the
-          camera baing unplugged
+          camera being unplugged
         """
         if not self._mount_path_exists():
             print("Please plug-in camera.")
@@ -82,7 +82,7 @@ class Source:
         :param pathlib.Path tempdir: temporary directoy, managed by the caller,
           where the raw images are stored
         :param bool wait_for_disconnect: whether to explicitly wait for the
-          camera baing unplugged
+          camera being unplugged
 
         :returns: iterator over the image files; each item is a tuple which
           consists of the page index (starting at zero), the number of pages,
