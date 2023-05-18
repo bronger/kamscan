@@ -12,7 +12,7 @@ Example settings::
     reuse_dir_prefix: /tmp/kamscan_nex_7
 """
 
-import time, os, os.path, uuid
+import time, os, os.path, uuid, datetime
 from contextlib import contextmanager
 from pathlib import Path
 from ..utils import silent_call
