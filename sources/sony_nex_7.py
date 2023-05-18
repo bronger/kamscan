@@ -27,6 +27,8 @@ class Source:
             self.reuse_dir = Path(reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
             os.makedirs(self.reuse_dir)
             print("Rohdateien werden gespeichert unter:", self.reuse_dir)
+        else:
+            self.reuse_dir = None
         self.path = path
         if not self.path:
             with self._camera_connected():
@@ -130,7 +132,9 @@ class Source:
                         yield page_index, page_count, destination
                         break
             assert rsync.wait() == 0
-            silent_call(["cp", "--reflink"] + list(raw_paths) + [self.reuse_dir])
+            if self.reuse_dir:
+                silent_call(["cp", "--reflink=auto"] + list(raw_paths) + [self.reuse_dir])
+                print("Stored ARWs in", self.reuse_dir)
 
     @staticmethod
     def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
