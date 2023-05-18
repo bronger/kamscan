@@ -111,10 +111,12 @@ class Source:
           and the path to the image file
         :rtype: iterator[tuple[int, pathlib.Path]]
         """
-        if not for_calibration and self.reuse_dir:
-            with os.scandir(self.reuse_dir) as it:
-                raw_files = [entry.path for entry in it]
+        if not for_calibration and self.old_reuse_dir:
+            with os.scandir(self.old_reuse_dir) as it:
+                raw_files = [Path(entry.path) for entry in it]
+            silent_call(["cp", "--reflink=auto"] + list(raw_files) + [tempdir])
             raw_files.sort()
+            raw_files = [tempdir/path.name for path in raw_files]
             page_count = len(raw_files)
             for page_index, raw_file in enumerate(raw_files):
                 yield page_index, page_count, raw_file
@@ -150,9 +152,10 @@ class Source:
                         yield page_index, page_count, destination
                         break
             assert rsync.wait() == 0
-            if self.reuse_dir:
-                silent_call(["cp", "--reflink=auto"] + list(raw_paths) + [self.reuse_dir])
-                print("Stored ARWs in", self.reuse_dir)
+            if not for_calibration:
+                if reuse_dir := self._prepare_reuse_dir():
+                    silent_call(["cp", "--reflink=auto"] + list(raw_paths) + [reuse_dir])
+                    print("Stored ARWs in", reuse_dir)
 
     @staticmethod
     def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
