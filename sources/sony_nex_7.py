@@ -155,7 +155,7 @@ class Source:
             if not for_calibration:
                 if reuse_dir := self._prepare_reuse_dir():
                     silent_call(["cp", "--reflink=auto"] + list(raw_paths) + [reuse_dir])
-                    print("Stored ARWs in", reuse_dir)
+                    print(f"You may pass “--params {reuse_dir}” to re-use the raw files")
 
     @staticmethod
     def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
