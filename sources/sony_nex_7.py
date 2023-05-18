@@ -4,7 +4,7 @@ from ..utils import silent_call
 
 
 class Source:
-    """Class with abstracts the interface to a camera.
+    """Class with abstracts the interface to a Sony NEX-7.
 
     :var pathlib.Path mount_path: Path to the directory which contains the
       image files if the camera's storage is mounted.  All subdirectories are
