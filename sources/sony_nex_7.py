@@ -26,28 +26,27 @@ class Source:
       searched for images as well.
     """
 
-    def __init__(self, configuration, path):
+    def __init__(self, configuration, reuse_dir):
         """Class constructor.
 
         :param dict[str, object] configuration: global configuration, as read
           from ``configuration.yaml``.
-        :param path: directory with the ARW files; if None, they are read from
-          the camera
+        :param reuse_dir: directory with the ARW files; if None, they are read
+          from the camera
 
-        :type path: str or NoneType
+        :type reuse_dir: str or NoneType
         """
         self.mount_path = Path(configuration["camera_mount_path"])
-        reuse_dir_prefix = configuration.get("reuse_dir_prefix")
-        if reuse_dir_prefix:
-            self.reuse_dir = Path(reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
-            os.makedirs(self.reuse_dir)
-            print("Rohdateien werden gespeichert unter:", self.reuse_dir)
-        else:
-            self.reuse_dir = None
-        self.path = path
-        if not self.path:
-            with self._camera_connected():
-                self.paths = self._collect_paths()
+        self.reuse_dir_prefix = configuration.get("reuse_dir_prefix")
+        self.reuse_dir = reuse_dir
+        self.paths = None
+
+    def _prepare_reuse_dir(self):
+        if self.reuse_dir_prefix:
+            reuse_dir = Path(self.reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
+            os.makedirs(reuse_dir)
+            print("Rohdateien werden gespeichert unter:", reuse_dir)
+            return reuse_dir
 
     def _mount_path_exists(self):
         """Returns whether the mount point of the camera exists.
@@ -94,7 +93,7 @@ class Source:
                     result.add(filepath)
         return result
 
-    def images(self, tempdir, wait_for_disconnect=True):
+    def images(self, tempdir, for_calibration=False):
         """Returns in iterator over the new images on the camera storage.  “New” means
         here that they were added after the last call to this generator, or
         after the instatiation of this `Source` object.
@@ -103,16 +102,21 @@ class Source:
 
         :param pathlib.Path tempdir: temporary directoy, managed by the caller,
           where the raw images are stored
-        :param bool wait_for_disconnect: whether to explicitly wait for the
-          camera being unplugged
+        :param bool for_calibration: Whether the images are taken for
+          calibration.  If ``True``, the ARWs are not kept, and we wait for a
+          disconnect of the camera, so that a subsequent call does not
+          immediately look for new images.
 
         :returns: iterator over the image files; each item is a tuple which
           consists of the page index (starting at zero), the number of pages,
           and the path to the image file
         :rtype: iterator[tuple[int, pathlib.Path]]
         """
-        if self.path:
-            with os.scandir(self.path) as it:
+        if not for_calibration and self.reuse_dir:
+            if self.paths is None:
+                with self._camera_connected():
+                    self.paths = self._collect_paths()
+            with os.scandir(self.reuse_dir) as it:
                 raw_files = [entry.path for entry in it]
             raw_files.sort()
             page_count = len(raw_files)
@@ -120,7 +124,7 @@ class Source:
                 yield page_index, page_count, raw_file
             return
         print("Please take pictures.  Then:")
-        with self._camera_connected(wait_for_disconnect):
+        with self._camera_connected(wait_for_disconnect=for_calibration):
             paths = self._collect_paths()
             new_paths = paths - self.paths
             paths_with_timestamps = []
