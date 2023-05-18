@@ -178,7 +178,8 @@ def datetime_to_pdf(timestamp, timestamp_accuracy="full"):
     return timestamp
 
 
-source = importlib.import_module("sources." + args.source).Source(configuration["sources"][args.source], source_parameters)
+source_module = importlib.import_module(".sources." + args.source, "kamscan")
+source = source_module.Source(configuration["sources"][args.source], source_parameters)
 
 
 class CorrectionData:
