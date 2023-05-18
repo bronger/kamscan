@@ -1,3 +1,17 @@
+"""Plugin for the Sony NEX-7, which does not support tethering.  It supports
+one parameter, which is interpreted as the path to ARW files of a previous run.
+At the same time, the path to current run’s ARW files is printed after
+everthing has been read from the camera.
+
+Example settings::
+
+  sony_nex_7:
+    camera: "1"
+    lenses: ["1", "2"]
+    camera_mount_path: /media/bronger/3937-6637/DCIM
+    reuse_dir_prefix: /tmp/kamscan_nex_7
+"""
+
 import time, os, os.path, uuid
 from contextlib import contextmanager
 from pathlib import Path
