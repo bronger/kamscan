@@ -363,12 +363,12 @@ def get_correction_data():
                 except KeyError:
                     print("Invalid input.")
                 else:
-                    setattr(correction_data, correction_attribute_name, (make_and_model["make"], make_and_model["model"]))
+                    setattr(correction_data, correction_attribute_name, [make_and_model["make"], make_and_model["model"]])
                     break
         else:
             make = input(correction_attribute_name + " make? ")
             model = input(correction_attribute_name + " model? ")
-            setattr(correction_data, correction_attribute_name, (make, model))
+            setattr(correction_data, correction_attribute_name, [make, model])
     print("Calibration is necessary.  First the flat field, then for the position, or one image for both …")
     correction_data = analyze_calibration_image()
     input_choice("cameras", "camera")
