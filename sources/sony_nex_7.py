@@ -45,7 +45,6 @@ class Source:
         if self.reuse_dir_prefix:
             reuse_dir = Path(self.reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
             os.makedirs(reuse_dir)
-            print("Rohdateien werden gespeichert unter:", reuse_dir)
             return reuse_dir
 
     def _mount_path_exists(self):
