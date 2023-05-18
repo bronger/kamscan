@@ -26,19 +26,19 @@ class Source:
       searched for images as well.
     """
 
-    def __init__(self, configuration, reuse_dir):
+    def __init__(self, configuration, old_reuse_dir):
         """Class constructor.
 
         :param dict[str, object] configuration: global configuration, as read
           from ``configuration.yaml``.
-        :param reuse_dir: directory with the ARW files; if None, they are read
+        :param old_reuse_dir: directory with the ARW files; if None, they are read
           from the camera
 
-        :type reuse_dir: str or NoneType
+        :type old_reuse_dir: str or NoneType
         """
         self.mount_path = Path(configuration["camera_mount_path"])
         self.reuse_dir_prefix = configuration.get("reuse_dir_prefix")
-        self.reuse_dir = reuse_dir
+        self.old_reuse_dir = old_reuse_dir
         self.paths = None
 
     def _prepare_reuse_dir(self):
