@@ -42,10 +42,11 @@ it explicitly, like::
 
     #!/bin/sh
 
-    ~/src/kamscan/kamscan.py "$@"
+    PYTHONPATH=~/src python -m kamscan.kamscan "$@"
 
-This is because ``kamscan.py`` looks for its utilities in the directory it was
-called in.
+(In my case, kamscan installed in ``~/src/kamscan``.)  This is because
+``kamscan.py`` uses relative imports, and it looks for its utilities in the
+directory it was called in.
 
 
 Camera setup
