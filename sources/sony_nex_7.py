@@ -113,9 +113,6 @@ class Source:
         :rtype: iterator[tuple[int, pathlib.Path]]
         """
         if not for_calibration and self.reuse_dir:
-            if self.paths is None:
-                with self._camera_connected():
-                    self.paths = self._collect_paths()
             with os.scandir(self.reuse_dir) as it:
                 raw_files = [entry.path for entry in it]
             raw_files.sort()
@@ -123,6 +120,9 @@ class Source:
             for page_index, raw_file in enumerate(raw_files):
                 yield page_index, page_count, raw_file
             return
+        if self.paths is None:
+            with self._camera_connected():
+                self.paths = self._collect_paths()
         print("Please take pictures.  Then:")
         with self._camera_connected(wait_for_disconnect=for_calibration):
             paths = self._collect_paths()
