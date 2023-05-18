@@ -183,7 +183,7 @@ class Source:
             dcraw_call.append("-d")
         if b is not None:
             dcraw_call.extend(["-b", b])
-        dcraw_call.append(str(path))
+        dcraw_call.append(path)
         output_path = path.with_suffix(".pgm") if "-d" in dcraw_call else path.with_suffix(".ppm")
         dcraw = silent_call(dcraw_call, asynchronous)
         if asynchronous:
