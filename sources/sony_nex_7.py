@@ -22,7 +22,7 @@ class Source:
         :type path: str or NoneType
         """
         self.mount_path = Path(configuration["camera_mount_path"])
-        reuse_dir_prefix = configuration.get("reuse_dir_prefix"])
+        reuse_dir_prefix = configuration.get("reuse_dir_prefix")
         if reuse_dir_prefix:
             self.reuse_dir = Path(reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
             os.makedirs(self.reuse_dir)
