@@ -141,6 +141,8 @@ class Source:
                 page_count += 1
             rsync = silent_call(["rsync"] + [path[0] for path in path_tuples] + [tempdir], asynchronous=True)
             raw_paths = set()
+            if not path_tuples:
+                raise Exception("No images found.")
             while path_tuples:
                 for path_tuple in path_tuples:
                     old_path, intermediate_path, destination, page_index = path_tuple

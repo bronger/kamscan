@@ -273,19 +273,14 @@ def analyze_calibration_image():
         return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
-        count = 0
-        for index, count, path in source.images(tempdir, for_calibration=True):
-            if count > 2:
+        for index, last_page, path in source.images(tempdir, for_calibration=True):
+            if index > 1:
                 raise Exception("More than two calibration images found.")
             if index == 0:
                 path_color, dcraw_color = source.raw_to_pnm(path, extra_raw=True, asynchronous=True)
                 path_gray, dcraw_gray = source.raw_to_pnm(path, extra_raw=True, gray=True, asynchronous=True)
-            else:
+            if last_page:
                 points = get_points(path)
-        if count == 0:
-            raise Exception("No calibration image found.")
-        elif count == 1:
-            points = get_points(path)
         assert dcraw_color.wait() == 0
         assert dcraw_gray.wait() == 0
         shutil.move(str(path_color), str(profile_root/"flatfield.ppm"))
