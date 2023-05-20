@@ -59,7 +59,7 @@ if args.full_height is None:
 elif args.calibration:
     page_height = args.full_height
 else:
-    raise Exception("You can give --full-height only with --calibration.")
+    raise RuntimeError("You can give --full-height only with --calibration.")
 
 assert args.filepath.parent.is_dir()
 
@@ -89,7 +89,7 @@ if match:
     timestamp = datetime.datetime(year, month, day, tzinfo=pytz.UTC)
     title = match.group("title").replace("_", " ")
 else:
-    raise Exception("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
+    raise RuntimeError("Invalid format for filepath.  Must be YYYY-MM-DD_Title.pdf.")
 
 if "icc_profile" in configuration:
     icc_path, icc_color_space = configuration["icc_profile"]
@@ -415,7 +415,7 @@ def analyze_calibration_image():
     :returns: correction data for this scan
     :rtype: CorrectionData
 
-    :raises Exception: if more than two calibration images were found on the
+    :raises RuntimeError: if more than two calibration images were found on the
       camera storage, or none
     """
     def get_points(path):
@@ -430,14 +430,14 @@ def analyze_calibration_image():
         count = 0
         for index, count, path in camera.images(tempdir):
             if count > 2:
-                raise Exception("More than two calibration images found.")
+                raise RuntimeError("More than two calibration images found.")
             if index == 0:
                 path_color, dcraw_color = call_dcraw(path, extra_raw=True, asynchronous=True)
                 path_gray, dcraw_gray = call_dcraw(path, extra_raw=True, gray=True, asynchronous=True)
             else:
                 points = get_points(path)
         if count == 0:
-            raise Exception("No calibration image found.")
+            raise RuntimeError("No calibration image found.")
         elif count == 1:
             points = get_points(path)
         assert dcraw_color.wait() == 0
