@@ -16,10 +16,10 @@ import time, os, os.path, uuid, datetime
 from contextlib import contextmanager
 from pathlib import Path
 from ..utils import silent_call
-from .utils import DCRawSource
+from .utils import DCRawSource, Reuser
 
 
-class Source(DCRawSource):
+class Source(DCRawSource, Reuser):
     """Class with abstracts the interface to a Sony NEX-7.
 
     :var pathlib.Path mount_path: Path to the directory which contains the
@@ -37,16 +37,9 @@ class Source(DCRawSource):
 
         :type old_reuse_dir: str or NoneType
         """
+        super().__init__(configuration, old_reuse_dir)
         self.mount_path = Path(configuration["camera_mount_path"])
-        self.reuse_dir_prefix = configuration.get("reuse_dir_prefix")
-        self.old_reuse_dir = old_reuse_dir
         self.paths = None
-
-    def _prepare_reuse_dir(self):
-        if self.reuse_dir_prefix:
-            reuse_dir = Path(self.reuse_dir_prefix + "-" + uuid.uuid4().hex[:8])
-            os.makedirs(reuse_dir)
-            return reuse_dir
 
     def _mount_path_exists(self):
         """Returns whether the mount point of the camera exists.
@@ -113,14 +106,7 @@ class Source(DCRawSource):
         :rtype: iterator[tuple[int, bool, pathlib.Path]]
         """
         if not for_calibration and self.old_reuse_dir:
-            with os.scandir(self.old_reuse_dir) as it:
-                raw_files = [Path(entry.path) for entry in it]
-            silent_call(["cp", "--reflink=auto"] + list(raw_files) + [tempdir])
-            raw_files.sort()
-            raw_files = [tempdir/path.name for path in raw_files]
-            page_count = len(raw_files)
-            for page_index, raw_file in enumerate(raw_files):
-                yield page_index, page_index == page_count - 1, raw_file
+            yield from self.consume_reuse_dir(tempdir)
             return
         if self.paths is None:
             with self._camera_connected():
@@ -156,6 +142,4 @@ class Source(DCRawSource):
                         break
             assert rsync.wait() == 0
             if not for_calibration:
-                if reuse_dir := self._prepare_reuse_dir():
-                    silent_call(["cp", "--reflink=auto"] + list(raw_paths) + [reuse_dir])
-                    print(f"You may pass “--params {reuse_dir}” to re-use the raw files")
+                self.fill_reuse_dir(raw_paths)
