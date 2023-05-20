@@ -124,3 +124,71 @@ No tethering is supported, only USB-stick-like mounting of the camera.
 
 Moreover, any bent pages are a problem.  They should be as flat as possible
 because no correction of any curvature takes place.
+
+
+Adding a new camera model
+=========================
+
+Place a new script in ``sources/``.  The name of the script (without the
+``.py``) must match the name of the key in the configration file under
+“sources”.
+
+The API that the class must fulfil is simple:
+
+- name it “Source”
+- accept the arguments “configuration” and “params” in the constructor
+- define the methods “images” and “raw_to_pnm”
+
+
+Constructor arguments
+---------------------
+
+“configuration” is a nested dictionary with the part of the configuration file
+that belongs to the source.
+
+“params” is the value that was passed with the ``--params`` argument on the
+command line.  If no such argument was given, it is ``None``.  If it was only a
+single value, it is that value.  If it was a comma-separated list of key=value
+pairs, it is a dictionary with those pairs.
+
+
+The method “images”
+-------------------
+
+This iterator yields the raw images from the camera in the order that they were
+taken.  It yields a tuple of image index (starting with 0), whether it is the
+last page, and the path to the image.  There must be at least one image in the
+iterator.
+
+
+The method “raw_to_pnm”
+-----------------------
+
+This method converts a camera raw file into a PNM.  It does so as raw as
+possible, i.e. no corrections.  In particular, the colour space must be linear.
+It takes the following parameters:
+
+``path``
+  The path to the raw file.  The output file must have the same path but with
+  the extension ``.ppm`` (colour) or ``.pgm`` (grey).
+
+``for_preview``
+  (Default: ``False``.)  If ``True``, generate a pnm that looks decently
+  instead of being raw.  In particular, it should be white-balanced and
+  gamma-corrected.
+
+``gray``
+  (Default: ``False``.)  Whether a PGM should be produced.
+
+``b``
+  Exposure correction; all intensities are multiplied by this value.  Default
+  is no exposure correction.
+
+``asynchronous``
+  (Default: ``False``.)  If ``True``, the external process that does the
+  conversion is called asynchronously.
+
+The return type depends on the last parameter ``asynchronous``.  If it is
+``False``, the path to the PNM path is returned.  Otherwise, a tuple is
+returned with the output path and the external process (of the type
+``subprocess.Popen``).
