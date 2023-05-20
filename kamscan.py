@@ -729,7 +729,7 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
     :rtype: list[pathlib.Path] or list[NoneType]
     """
     process_left = page_index != 0 or page_count < 3
-    process_right = page_index != page_count - 1 or page_count < 3
+    process_right = page_index != page_count - 1 or page_count == 1
     tiff_filepaths = []
     if filepath_tiff:
         if process_left:
