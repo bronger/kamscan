@@ -107,9 +107,9 @@ class Source:
           immediately look for new images.
 
         :returns: iterator over the image files; each item is a tuple which
-          consists of the page index (starting at zero), the number of pages,
-          and the path to the image file
-        :rtype: iterator[tuple[int, pathlib.Path]]
+          consists of the page index (starting at zero), whether it is the last
+          page, and the path to the image file
+        :rtype: iterator[tuple[int, bool, pathlib.Path]]
         """
         if not for_calibration and self.old_reuse_dir:
             with os.scandir(self.old_reuse_dir) as it:
@@ -119,7 +119,7 @@ class Source:
             raw_files = [tempdir/path.name for path in raw_files]
             page_count = len(raw_files)
             for page_index, raw_file in enumerate(raw_files):
-                yield page_index, page_count, raw_file
+                yield page_index, page_index == page_count - 1, raw_file
             return
         if self.paths is None:
             with self._camera_connected():
@@ -151,7 +151,7 @@ class Source:
                         raw_paths.add(destination)
                         os.remove(str(old_path))
                         path_tuples.remove(path_tuple)
-                        yield page_index, page_count, destination
+                        yield page_index, page_index == page_count - 1, destination
                         break
             assert rsync.wait() == 0
             if not for_calibration:

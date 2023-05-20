@@ -549,7 +549,7 @@ def color_process_single_tiff(filepath, density, mode, suffix):
     return filepath
 
 
-def split_two_side(page_index, page_count, filepath_tiff, width, height):
+def split_two_side(page_index, last_page, filepath_tiff, width, height):
     """Crops the two pages out of the double-page scan.  Note that “width” is the
     height of the double page page (and thus also of the single page), and
     “height” is the width of the double page.
@@ -557,7 +557,7 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
     :param int page_index: Index of the current page.  In two-side mode, this
       is the index of the current double page because separation of left and
       right happens in this function.
-    :param int page_count: number of (double) pages
+    :param bool last_page: whether it is the last page
     :param filepath_tiff: path to a TIFF with the scan area (i.e., the double
       page)
     :type filepath_tiff: pathlib.Path or NoneType
@@ -571,8 +571,10 @@ def split_two_side(page_index, page_count, filepath_tiff, width, height):
       ``None``s if `filepath_tiff` was ``None``.
     :rtype: list[pathlib.Path] or list[NoneType]
     """
-    process_left = page_index != 0 or page_count < 3
-    process_right = page_index != page_count - 1 or page_count < 3
+    first_page = page_index == 0
+    only_one_page = first_page and last_page
+    process_left = not first_page or only_one_page
+    process_right = not last_page or only_one_page
     tiff_filepaths = []
     if filepath_tiff:
         if process_left:
@@ -660,14 +662,14 @@ def single_page_raw_pdfs(tiff_filepaths, ocr_tiff_filepaths, output_path):
     return result
 
 
-def process_image(filepath, page_index, page_count, output_path):
+def process_image(filepath, page_index, last_page, output_path):
     """Converts one raw image to a searchable single-page PDF.
 
     :param pathlib.Path filepath: path to the raw image file
     :param int page_index: Index of the current page.  In two-side mode, this
       is the index of the current double page because separation of left and
       right happens in this function.
-    :param int page_count: number of (double) pages
+    :param bool last_page: whether it is the last page
     :param pathlib.Path output_path: directory where the PDFs are written to
 
     :returns: path to the PDF, or the two PDFs in two-side mode
@@ -682,8 +684,8 @@ def process_image(filepath, page_index, page_count, output_path):
     else:
         filepath_ocr_tiff = color_process_single_tiff(filepath_tiff, density, "gray_linear", "-ocr")
     if args.two_side:
-        tiff_filepaths = split_two_side(page_index, page_count, filepath_image_tiff, width, height)
-        ocr_tiff_filepaths = split_two_side(page_index, page_count, filepath_ocr_tiff, width, height)
+        tiff_filepaths = split_two_side(page_index, last_page, filepath_image_tiff, width, height)
+        ocr_tiff_filepaths = split_two_side(page_index, last_page, filepath_ocr_tiff, width, height)
     else:
         tiff_filepaths = [filepath_image_tiff]
         ocr_tiff_filepaths = [filepath_ocr_tiff]
@@ -738,10 +740,10 @@ with tempfile.TemporaryDirectory() as tempdir:
     tempdir = Path(tempdir)
     pool = multiprocessing.Pool()
     results = set()
-    for index, count, path in source.images(tempdir):
+    for index, last_page, path in source.images(tempdir):
         if start is None:
             start = time.time()
-        results.add(pool.apply_async(process_image, (path, index, count, tempdir)))
+        results.add(pool.apply_async(process_image, (path, index, last_page, tempdir)))
     print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
     pool.close()
     pool.join()
