@@ -160,16 +160,17 @@ class Source:
                     print(f"You may pass “--params {reuse_dir}” to re-use the raw files")
 
     @staticmethod
-    def raw_to_pnm(path, extra_raw, gray=False, b=None, asynchronous=False):
+    def raw_to_pnm(path, for_preview=False, gray=False, b=None, asynchronous=False):
         """Calls dcraw to convert a raw image to a PNM file.  In case of `gray`
         being ``False``, it is a PPM file, otherwise, it is a PGM file.  If
-        `extra_raw` is ``False``, the colour depth is 8 bit, and various colour
-        space transformations of dcraw are applied in order to make the result
-        look nice.
+        `for_preview` is ``True``, the colour depth is 8 bit, and various
+        colour space transformations of dcraw are applied in order to make the
+        result look nice.  But if `for_preview` is ``False`` (the default), the
+        result is as raw as possible, i.e. 16 bit, linear, no colour space
+        transformation.
 
         :param pathlib.Path path: path to the raw image file
-        :param bool extra_raw: whether the result is as raw as possible,
-          i.e. 16 bit, linear, no colour space transformation
+        :param bool for_preview: 
         :param bool gray: wether to produce a greyscale file; if ``False``,
           demosaicing is applied
         :param float b: exposure correction; all intensities are multiplied by this
@@ -181,7 +182,7 @@ class Source:
         :rtype: pathlib.Path or tuple[pathlib.Path, subprocess.Popen]
         """
         dcraw_call = ["dcraw", "-t", 5]
-        if extra_raw:
+        if not for_preview:
             dcraw_call.extend(["-o", 0, "-M", "-6", "-g", 1, 1, "-r", 1, 1, 1, 1, "-W"])
         if gray:
             dcraw_call.append("-d")

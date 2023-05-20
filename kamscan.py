@@ -268,7 +268,7 @@ def analyze_calibration_image():
         temp_path = append_to_path_stem(path, "-unraw")
         # For avoiding a race with the flat field PPM generation.
         os.rename(str(path), str(temp_path))
-        ppm_path = source.raw_to_pnm(temp_path, extra_raw=False)
+        ppm_path = source.raw_to_pnm(temp_path, for_preview=True)
         raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
         return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
     with tempfile.TemporaryDirectory() as tempdir:
@@ -277,8 +277,8 @@ def analyze_calibration_image():
             if index > 1:
                 raise RuntimeError("More than two calibration images found.")
             if index == 0:
-                path_color, dcraw_color = source.raw_to_pnm(path, extra_raw=True, asynchronous=True)
-                path_gray, dcraw_gray = source.raw_to_pnm(path, extra_raw=True, gray=True, asynchronous=True)
+                path_color, dcraw_color = source.raw_to_pnm(path, asynchronous=True)
+                path_gray, dcraw_gray = source.raw_to_pnm(path, gray=True, asynchronous=True)
             if last_page:
                 points = get_points(path)
         assert dcraw_color.wait() == 0
@@ -412,7 +412,7 @@ def raw_to_corrected_pnm(filepath):
       its width and height; all in pixels from the top left
     :rtype: pathlib.Path, float, float, float, float
     """
-    filepath = source.raw_to_pnm(filepath, extra_raw=True, gray=args.mode in {"gray", "mono"}, b=0.9)
+    filepath = source.raw_to_pnm(filepath, gray=args.mode in {"gray", "mono"}, b=0.9)
     flatfield_path = (profile_root/"flatfield").with_suffix(".pgm" if args.mode in {"gray", "mono"} else ".ppm")
     tempfile = append_to_path_stem(filepath, "-temp")
     silent_call(["convert", filepath, flatfield_path, "-compose", "dividesrc", "-composite", tempfile])
