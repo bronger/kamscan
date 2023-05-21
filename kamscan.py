@@ -267,7 +267,7 @@ def analyze_calibration_image():
     def get_points(path):
         temp_path = append_to_path_stem(path, "-unraw")
         # For avoiding a race with the flat field PPM generation.
-        os.rename(str(path), str(temp_path))
+        os.symlink(str(path), str(temp_path))
         ppm_path = source.raw_to_pnm(temp_path, for_preview=True)
         raw_points = analyze_scan(2000, 3000, 0.1, ppm_path, 4)
         return [analyze_scan(x, y, 1, ppm_path, 1)[0] for x, y in raw_points]
