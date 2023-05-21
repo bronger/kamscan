@@ -27,8 +27,7 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
     kwargs = {"stdout": subprocess.DEVNULL if swallow_stdout else subprocess.PIPE,
-              "stderr": None if debug else subprocess.DEVNULL,
-              "universal_newlines": True, "env": environment}
+              "stderr": None if debug else subprocess.DEVNULL, "text": True, "env": environment}
     arguments = list(map(str, arguments))
     if asynchronous:
         return subprocess.Popen(arguments, **kwargs)
