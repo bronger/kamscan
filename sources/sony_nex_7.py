@@ -16,7 +16,8 @@ import time, os, os.path, uuid, datetime
 from contextlib import contextmanager
 from pathlib import Path
 from ..utils import silent_call
-from .utils import DCRawSource, Reuser
+from .utils.dcraw import DCRawSource
+from .utils.reuser import Reuser
 
 
 class Source(DCRawSource, Reuser):
