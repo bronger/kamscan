@@ -734,26 +734,26 @@ InfoValue: {}
         silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
         shutil.move(str(temp_filepath), str(filepath))
 
+if __name__ == '__main__':
+    start = None
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = Path(tempdir)
+        pool = multiprocessing.Pool()
+        results = set()
+        for index, last_page, path in source.images(tempdir):
+            if start is None:
+                start = time.time()
+            results.add(pool.apply_async(process_image, (path, index, last_page, tempdir)))
+        print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
+        pool.close()
+        pool.join()
+        pdfs = []
+        for result in results:
+            pdfs.extend(result.get())
+        pdfs.sort()
+        silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
+        embed_pdf_metadata(args.filepath)
+    if args.debug:
+        print("Time elapsed in seconds:", time.time() - start)
 
-start = None
-with tempfile.TemporaryDirectory() as tempdir:
-    tempdir = Path(tempdir)
-    pool = multiprocessing.Pool()
-    results = set()
-    for index, last_page, path in source.images(tempdir):
-        if start is None:
-            start = time.time()
-        results.add(pool.apply_async(process_image, (path, index, last_page, tempdir)))
-    print("Rest can be done in background.  You may now press Ctrl-Z and \"bg\" this script.")
-    pool.close()
-    pool.join()
-    pdfs = []
-    for result in results:
-        pdfs.extend(result.get())
-    pdfs.sort()
-    silent_call(["pdftk"] + [pdf for pdf in pdfs] + ["cat", "output", args.filepath])
-    embed_pdf_metadata(args.filepath)
-if args.debug:
-    print("Time elapsed in seconds:", time.time() - start)
-
-silent_call(["evince", args.filepath])
+    silent_call(["evince", args.filepath])
