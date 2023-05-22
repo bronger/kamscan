@@ -122,10 +122,8 @@ Some hints going beyond the output of ``kamscan.py --help``:
 Limitations
 ============
 
-No tethering is supported, only USB-stick-like mounting of the camera.
-
-Moreover, any bent pages are a problem.  They should be as flat as possible
-because no correction of any curvature takes place.
+Any bent pages are a problem.  They should be as flat as possible because no
+correction of any curvature takes place.
 
 
 Adding a new camera model
