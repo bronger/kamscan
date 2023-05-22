@@ -324,51 +324,23 @@ def get_correction_data():
     :returns: correction data for the current profile
     :rtype: CorrectionData
     """
-    def input_choice(configuration_name, correction_attribute_name):
-        """Sets an attribute in `correction_data` according to user input.  The user is
-        given choices from the configuration file
-        ``~/.config/kamscan/configuration.yaml``.  For example, it may
-        contain::
-
-            cameras:
-              "1":
-                make: Sony
-                model: NEX-7
-            lenses:
-              "1":
-                make: Sony
-                model: E 50mm f/1.8 OSS (kamscan)
-
-        Then, the user may enter, say, “1” for setting the profile to NEX-7.
-        Note that the dictionary keys in the configuration file must be
-        strings.
-
-        :param str configuration_name: name of the dictionary in the
-          configuration file, e.g. “cameras”
-        :param str correction_attribute_name: name of the attribute in the
-          `CorrectionData` singleton
-        """
-        if configuration_name in configuration:
-            for name, make_and_model in configuration[configuration_name].items():
-                make, model = make_and_model["make"], make_and_model["model"]
-                print(f"{name}: {make}, {model}")
-            while True:
-                try:
-                    make_and_model = configuration[configuration_name][input("? ")]
-                except KeyError:
-                    print("Invalid input.")
-                else:
-                    setattr(correction_data, correction_attribute_name, [make_and_model["make"], make_and_model["model"]])
-                    break
-        else:
-            make = input(correction_attribute_name + " make? ")
-            model = input(correction_attribute_name + " model? ")
-            setattr(correction_data, correction_attribute_name, [make, model])
     print("Calibration is necessary.  First the flat field, then for the position, or one image for both …")
     correction_data = analyze_calibration_image()
-    input_choice("cameras", "camera")
-    print()
-    input_choice("lenses", "lens")
+    source_configuration = configuration["sources"][args.source]
+
+    correction_data.camera = [source_configuration["make"], source_configuration["model"]]
+
+    lenses = configuration["lenses"]
+    lens_indices = source_configuration["lenses"]
+    for lens_index in lens_indices:
+        lens = lenses[lens_index]
+        print("{}: {}, {}".format(lens_index, lens["make"], lens["model"]))
+    while True:
+        if (lens_index := input("? ")) in lens_indices:
+            lens = lenses[lens_index]
+            correction_data.lens = [lens["make"], lens["model"]
+            break
+
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
     return correction_data
 
