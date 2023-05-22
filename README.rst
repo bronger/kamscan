@@ -3,7 +3,7 @@ Kamscan
 ==========
 
 Kamscan implements a camera-based scan station for documents.  It does so as a
-command line tool, making the process very convennient and efficient.
+command line tool, making the process very convenient and efficient.
 
 It captures pictures with a photo camera and converts them to a PDF document.
 Additionally, it leverages OCR software to embed the text as text in the PDF,
@@ -130,7 +130,7 @@ Adding a new camera model
 =========================
 
 Place a new script in ``sources/``.  The name of the script (without the
-``.py``) must match the name of the key in the configration file under
+``.py``) must match the name of the key in the configuration file under
 “sources”.
 
 The API that the class must fulfil is simple:
