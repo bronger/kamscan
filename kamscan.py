@@ -734,6 +734,7 @@ InfoValue: {}
         silent_call(["pdftk", filepath, "update_info_utf8", info_filepath, "output", temp_filepath])
         shutil.move(str(temp_filepath), str(filepath))
 
+
 if __name__ == '__main__':
     start = None
     with tempfile.TemporaryDirectory() as tempdir:
