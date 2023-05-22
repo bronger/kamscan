@@ -16,7 +16,7 @@ Prerequisites
 You need
 
 - Unix-like OS
-- Python 3.5
+- Python 3.7
 - Lensfun (modifier_api branch)
 - GCC
 - Tesseract 4
@@ -26,6 +26,7 @@ You need
 - dcraw
 - Kivy
 - pytz
+- click (Python package)
 - ruamel.yaml
 
 
