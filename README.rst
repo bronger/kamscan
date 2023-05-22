@@ -35,7 +35,6 @@ Installation
 
 1. Clone this repo.
 2. ``make undistort``
-3. ``./kamscan.py --help``
 
 Note that you cannot simply make a link in your ``PATH`` pointing to
 ``kamscan.py``.  Instead, you have to write a trivial shell script that calls
