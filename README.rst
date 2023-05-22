@@ -37,8 +37,8 @@ Installation
 2. ``make undistort``
 
 Note that you cannot simply make a link in your ``PATH`` pointing to
-``kamscan.py``.  Instead, you have to write a trivial shell script that calls
-it explicitly, like::
+``kamscan.py``.  Instead, you have to write a trivial shell script named
+``kamscan`` that calls it explicitly, like::
 
     #!/bin/sh
 
@@ -47,6 +47,8 @@ it explicitly, like::
 (In my case, kamscan installed in ``~/src/kamscan``.)  This is because
 ``kamscan.py`` uses relative imports, and it looks for its utilities in the
 directory it was called in.
+
+Then, you can call ``kamscan --help`` as a starting point.
 
 
 Camera setup
