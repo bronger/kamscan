@@ -17,7 +17,7 @@ You need
 
 - Unix-like OS
 - Python 3.7
-- Lensfun (modifier_api branch)
+- Lensfun
 - GCC
 - Tesseract 4
 - pdftk
