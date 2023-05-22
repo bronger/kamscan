@@ -51,6 +51,44 @@ directory it was called in.
 Then, you can call ``kamscan --help`` as a starting point.
 
 
+Configuration
+=============
+
+The configuration file must be placed at
+``~/.config/kamscan/configuration.yaml``.  It may look like this::
+
+  sources:
+    sony_nex_7:
+      make: Sony
+      model: NEX-7
+      icc_profile:
+        path: /home/bronger/.config/darktable/color/in/nex7_matrix.icc
+        color_space: Lab
+      lenses: ["1", "2"]
+      reuse_dir_prefix: /tmp/kamscan_nex_7
+    sony_a6000:
+      make: Sony
+      model: A6000
+      icc_profile:
+        path: /home/bronger/.config/darktable/color/in/nex7_matrix.icc
+        color_space: Lab
+      lenses: ["1", "2"]
+      reuse_dir_prefix: /tmp/kamscan_a6000
+  default_source: sony_a6000
+  lenses:
+    "1":
+      make: Sony
+      model: E 50mm f/1.8 OSS (kamscan)
+    "2":
+      make: Sony
+      model: E 50mm f/1.8 OSS
+
+This configuration file contains two possible camera sources that you can
+select with the ``--source`` argument.  The Sony α6000 is the default.
+Furthermore, two lenses are selectable.  “Model” and “make” refer to the
+respective values in the Lensfun database.
+
+
 Camera setup
 ===============
 
