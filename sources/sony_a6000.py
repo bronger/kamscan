@@ -12,7 +12,7 @@ Example settings::
     reuse_dir_prefix: /tmp/kamscan_a6000
 """
 
-import time, os, os.path, uuid, datetime
+import time, os, os.path, uuid, datetime, subprocess
 from contextlib import contextmanager
 from pathlib import Path
 import click
@@ -68,7 +68,18 @@ class Source(DCRawSource, Reuser):
                 print("Wait …")
             path = tempdir/f"{index}.ARW"
             raw_paths.add(path)
-            silent_call(["gphoto2", "--capture-image-and-download", f"--filename={path}"])
+            cycles_left = 5
+            while True:
+                try:
+                    silent_call(["gphoto2", "--capture-image-and-download", f"--filename={path}"], timeout=5)
+                except subprocess.TimeoutExpired:
+                    print("ERROR: gphoto2 had a timeout.  Retry.")
+                    time.sleep(2)
+                    cycles_left -= 1
+                    if not cycles_left:
+                        raise
+                else:
+                    break
             yield index, last_page, path
             index += 1
         if not for_calibration:
