@@ -338,7 +338,7 @@ def get_correction_data():
     while True:
         if (lens_index := input("? ")) in lens_indices:
             lens = lenses[lens_index]
-            correction_data.lens = [lens["make"], lens["model"]
+            correction_data.lens = [lens["make"], lens["model"]]
             break
 
     pickle.dump(correction_data, open(str(calibration_file_path), "wb"))
