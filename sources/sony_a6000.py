@@ -69,18 +69,18 @@ class Source(DCRawSource, Reuser):
             path = tempdir/f"{index}.ARW"
             raw_paths.add(path)
             cycles_left = 5
-            while True:
+            while cycles_left:
                 path.unlink(missing_ok=True)
                 try:
                     silent_call(["gphoto2", "--capture-image-and-download", f"--filename={path}"], timeout=5)
                 except subprocess.TimeoutExpired:
                     print("ERROR: gphoto2 had a timeout.  Retry.")
-                    time.sleep(2)
-                    cycles_left -= 1
-                    if not cycles_left:
-                        raise
                 else:
-                    break
+                    if path.exists():
+                        break
+                    print("ERROR: gphoto2 wrote no image.  Retry.")
+                time.sleep(2)
+                cycles_left -= 1
             yield index, last_page, path
             index += 1
         if not for_calibration:
