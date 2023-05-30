@@ -4,7 +4,7 @@ import subprocess, os
 debug = False
 
 
-def silent_call(arguments, asynchronous=False, swallow_stdout=True):
+def silent_call(arguments, asynchronous=False, swallow_stdout=True, timeout=None):
     """Calls an external program.  stdout and stderr are swallowed by default.  The
     environment variable ``OMP_THREAD_LIMIT`` is set to one, because we do
     parallelism by ourselves.  In particular, Tesseract scales *very* badly (at
@@ -16,6 +16,10 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
       asynchronously
     :param bool swallow_stdout: if ``False``, stdout is caught and can be
       inspected by the caller (as a str rather than a byte string)
+    :param timeout: timeout in seconds; only applicable if “asynchronous” is
+      ``False``; default: no timeout
+
+    :type timeout: NoneType or int or float
 
     :returns: if asynchronous, it returns a ``Popen`` object, otherwise, it
       returns a ``CompletedProcess`` object.
@@ -30,7 +34,9 @@ def silent_call(arguments, asynchronous=False, swallow_stdout=True):
               "stderr": None if debug else subprocess.DEVNULL, "text": True, "env": environment}
     arguments = list(map(str, arguments))
     if asynchronous:
+        assert timeout is None
         return subprocess.Popen(arguments, **kwargs)
     else:
         kwargs["check"] = True
+        kwargs["timeout"] = timeout
         return subprocess.run(arguments, **kwargs)
