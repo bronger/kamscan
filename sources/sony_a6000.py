@@ -6,7 +6,8 @@ camera.
 Example settings::
 
   sony_a6000:
-    camera: "1"
+    make: Sony
+    model: ILCE-6000
     lenses: ["1", "2"]
     reuse_dir_prefix: /tmp/kamscan_a6000
 """
