@@ -70,9 +70,9 @@ class Source(DCRawSource, Reuser):
             raw_paths.add(path)
             cycles_left = 5
             while True:
+                path.unlink(missing_ok=True)
                 try:
-                    silent_call(["gphoto2", "--capture-image-and-download", "--force-overwrite", f"--filename={path}"],
-                                timeout=5)
+                    silent_call(["gphoto2", "--capture-image-and-download", f"--filename={path}"], timeout=5)
                 except subprocess.TimeoutExpired:
                     print("ERROR: gphoto2 had a timeout.  Retry.")
                     time.sleep(2)
