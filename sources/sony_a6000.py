@@ -66,7 +66,7 @@ class Source(DCRawSource, Reuser):
             last_page = ch == "\r"
             if not last_page:
                 print("Wait …")
-            path = tempdir/f"{index}.ARW"
+            path = tempdir/f"{index:06}.ARW"
             raw_paths.add(path)
             cycles_left = 5
             while cycles_left:
