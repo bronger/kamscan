@@ -38,6 +38,10 @@ class Source(DCRawSource, Reuser):
         """
         super().__init__(configuration, old_reuse_dir)
 
+    @staticmethod
+    def ping():
+        silent_call(["play", "--no-show-progress", "--null", "--channels", "1", "synth", "0.2", "sine", "1000"])
+
     def images(self, tempdir, for_calibration=False):
         """Returns in iterator over the images from the camera.  With the space
         key, you take a new image, and with the enter key, you take the last
@@ -81,6 +85,7 @@ class Source(DCRawSource, Reuser):
                     print("ERROR: gphoto2 wrote no image.  Retry.")
                 time.sleep(2)
                 cycles_left -= 1
+            self.ping()
             yield index, last_page, path
             index += 1
         if not for_calibration:
