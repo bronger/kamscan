@@ -729,4 +729,4 @@ if __name__ == '__main__':
     if args.debug:
         print("Time elapsed in seconds:", time.time() - start)
 
-    silent_call(["evince", args.filepath])
+    silent_call(["evince", "--fullscreen", args.filepath])
