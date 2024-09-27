@@ -310,7 +310,11 @@ def prune_profiles():
         now = datetime.datetime.now()
         minutes = (now.hour * 60 + now.minute - 5 * 60) % (24 * 60)
         minutes = max(minutes, 4 * 60)
-        silent_call(["find", profiles_root, "-mindepth", 1, "-mmin", "+{}".format(minutes), "-delete"])
+        directories = subprocess.run(["find", profiles_root, "-mindepth", "1", "-maxdepth", "1",
+                                      "-mmin", "+{}".format(minutes), "-type", "d", "-print0"],
+                                     check=True, text=True, capture_output=True).stdout.split("\x00")[:-1]
+        for directory in directories:
+            shutil.rmtree(directory)
 prune_profiles()
 os.makedirs(str(profile_root), exist_ok=True)
 calibration_file_path = profile_root/"calibration.pickle"
